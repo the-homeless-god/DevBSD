@@ -24,3 +24,12 @@ Testing
 On a running NetBSD system:
 
     cd /usr/tests; atf-run | atf-report
+
+
+Additional Links
+----------------
+
+- [Project's roadmap](https://github.com/users/the-homeless-god/projects/1)
+- [The NetBSD Guide](https://www.NetBSD.org/docs/guide/en/)
+- [NetBSD manual pages](https://man.NetBSD.org/)
+- [NetBSD Cross-Reference](https://nxr.NetBSD.org/)
