@@ -1,7 +1,8 @@
-#	$NetBSD: Makefile,v 1.281 2023/12/26 16:20:01 pgoyette Exp $
+#	$NetBSD: Makefile,v 1.284 2024/03/21 02:36:02 riastradh Exp $
 
 .include <bsd.own.mk>
 
+.if !make(includes)
 # For all platforms
 
 # Modules for compatibility with earlier versions of NetBSD
@@ -287,6 +288,7 @@ SUBDIR+=	acpibut
 SUBDIR+=	acpicpu
 SUBDIR+=	acpidalb
 SUBDIR+=	acpifan
+SUBDIR+=	acpihed
 SUBDIR+=	acpilid
 SUBDIR+=	acpipmtr
 SUBDIR+=	acpitz
@@ -294,6 +296,7 @@ SUBDIR+=	acpivga
 SUBDIR+=	acpiwdrt
 SUBDIR+=	acpiwmi
 SUBDIR+=	aibs
+SUBDIR+=	apei
 SUBDIR+=	asus
 SUBDIR+=	fujbp
 SUBDIR+=	fujhk
@@ -508,5 +511,7 @@ SUBDIR+=	vioscsi
 .endif
 
 SUBDIR+=	examples	# build these regularly to avoid bit-rot
+
+.endif
 
 .include <bsd.subdir.mk>
