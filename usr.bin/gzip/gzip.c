@@ -1,4 +1,4 @@
-/*	$NetBSD: gzip.c,v 1.123 2024/04/01 02:20:52 christos Exp $	*/
+/*	$NetBSD: gzip.c,v 1.125 2024/04/02 12:42:35 christos Exp $	*/
 
 /*
  * Copyright (c) 1997-2024 Matthew R. Green
@@ -34,7 +34,7 @@
 #ifndef lint
 __COPYRIGHT("@(#) Copyright (c) 1997-2024 Matthew R. Green. "
 	    "All rights reserved.");
-__RCSID("$NetBSD: gzip.c,v 1.123 2024/04/01 02:20:52 christos Exp $");
+__RCSID("$NetBSD: gzip.c,v 1.125 2024/04/02 12:42:35 christos Exp $");
 #endif /* not lint */
 
 /*
@@ -192,7 +192,9 @@ static	int	qflag;			/* quiet mode */
 static	int	rflag;			/* recursive mode */
 static	int	tflag;			/* test */
 static	int	vflag;			/* verbose mode */
+#ifdef SIGINFO
 static	sig_atomic_t print_info = 0;
+#endif
 #else
 #define		qflag	0
 #define		tflag	0
@@ -244,7 +246,11 @@ static	void	infile_set(const char *newinfile, off_t total);
 static	off_t	infile_total;		/* total expected to read/write */
 static	off_t	infile_current;		/* current read/write */
 
+#ifdef SIGINFO
 static	void	check_siginfo(void);
+#else
+#define check_siginfo() /* nothing */
+#endif
 static	off_t	cat_fd(unsigned char *, size_t, off_t *, int fd);
 static	void	prepend_gzip(char *, int *, char ***);
 static	void	handle_dir(char *);
@@ -1217,18 +1223,22 @@ unlink_input(const char *file, const struct stat *sb)
 	unlink(file);
 }
 
+#ifdef SIGINFO
 static void
 got_siginfo(int signo)
 {
 
 	print_info = 1;
 }
+#endif
 
 static void
 setup_signals(void)
 {
 
+#ifdef SIGINFO
 	signal(SIGINFO, got_siginfo);
+#endif
 }
 
 static	void
@@ -1713,7 +1723,7 @@ file_uncompress(char *file, char *outfile, size_t outsize)
 	return -1;
 }
 
-#ifndef SMALL
+#ifndef check_siginfo
 static void
 check_siginfo(void)
 {
@@ -1752,6 +1762,7 @@ check_siginfo(void)
 out:
 	print_info = 0;
 }
+#endif
 
 static off_t
 cat_fd(unsigned char * prepend, size_t count, off_t *gsizep, int fd)
@@ -1789,7 +1800,6 @@ cat_fd(unsigned char * prepend, size_t count, off_t *gsizep, int fd)
 		*gsizep = in_tot;
 	return (in_tot);
 }
-#endif
 
 static void
 handle_stdin(void)
