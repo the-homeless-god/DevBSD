@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.x11.mk,v 1.152 2024/04/02 16:17:29 christos Exp $
+#	$NetBSD: bsd.x11.mk,v 1.155 2024/05/09 06:34:51 nia Exp $
 
 .include <bsd.init.mk>
 
@@ -31,7 +31,7 @@ X11FLAGS.CONNECTION+=	-DIPv6
 #	 EXT_DEFINES
 X11FLAGS.BASE_EXTENSION=	-DMITMISC -DXTEST -DXTRAP -DXSYNC -DXCMISC \
 				-DXRECORD -DMITSHM -DBIGREQS -DXF86VIDMODE \
-				-DXF86MISC -DDPMSExtension -DEVI \
+				-DDPMSExtension -DEVI \
 				-DSCREENSAVER -DXV -DXVMC -DGLXEXT \
 				-DRES
 
@@ -83,8 +83,7 @@ X11FLAGS.OS_DEFINES=	-DDDXOSINIT -DSERVER_LOCK -DDDXOSFATALERROR \
 
 .if !(${MACHINE} == "acorn32"	|| \
     ${MACHINE} == "sun3"	|| \
-    ${MACHINE} == "x68k"	|| \
-    ${MACHINE} == "vax")
+    ${MACHINE} == "x68k")
 #	EXT_DEFINES
 X11FLAGS.EXTENSION+=	-DXF86VIDMODE
 
@@ -401,7 +400,7 @@ realinstall: appdefsinstall
 CLEANDIRFILES+= ${MAN:U${PROG:D${PROG.1}}}
 .endif								# }
 
-.SUFFIXES:	.man .man.pre .1 .3 .4 .5 .7
+.SUFFIXES:	.man .man.pre .1 .3 .4 .5 .7 .8
 
 # Note the escaping trick for _X11MANTRANSFORM using % to replace spaces
 XORGVERSION=	'"X Version 11"'
@@ -464,7 +463,7 @@ _X11MANTRANSFORMCMD+=	-e s,${__def__},${__value__:C/%/ /gW},g
 .endif
 _X11MANTRANSFORMCMD+=	${X11EXTRAMANDEFS}
 
-.man.1 .man.3 .man.4 .man.5 .man.7 .man.pre.1 .man.pre.4 .man.pre.5:
+.man.1 .man.3 .man.4 .man.5 .man.7 .man.8 .man.pre.1 .man.pre.4 .man.pre.5:
 	${_MKTARGET_CREATE}
 	rm -f ${.TARGET}
 	${_X11MANTRANSFORMCMD} | ${X11TOOL_UNXCOMM} > ${.TARGET}.tmp
