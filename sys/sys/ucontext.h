@@ -1,4 +1,4 @@
-/*	$NetBSD: ucontext.h,v 1.22 2024/05/18 01:21:42 thorpej Exp $	*/
+/*	$NetBSD: ucontext.h,v 1.24 2024/05/25 13:44:48 riastradh Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2003, 2024 The NetBSD Foundation, Inc.
@@ -82,9 +82,7 @@ struct __ucontext {
 #define _UC_UCONTEXT_ALIGN (~0)
 #endif
 
-#ifdef __UCONTEXT_SIZE
-__CTASSERT(sizeof(ucontext_t) == __UCONTEXT_SIZE);
-#else
+#ifndef __UCONTEXT_SIZE
 #define	__UCONTEXT_SIZE		sizeof(ucontext_t)
 #endif
 
@@ -108,6 +106,10 @@ int	setucontext(struct lwp *, const ucontext_t *);
 void	cpu_getmcontext(struct lwp *, mcontext_t *, unsigned int *);
 int	cpu_setmcontext(struct lwp *, const mcontext_t *, unsigned int);
 int	cpu_mcontext_validate(struct lwp *, const mcontext_t *);
+
+#ifdef __UCONTEXT_SIZE
+__CTASSERT(sizeof(ucontext_t) == __UCONTEXT_SIZE);
+#endif
 #endif /* _KERNEL */
 
 #endif /* !_SYS_UCONTEXT_H_ */

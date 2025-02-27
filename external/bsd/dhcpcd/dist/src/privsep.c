@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Privilege Separation for dhcpcd
- * Copyright (c) 2006-2023 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -125,12 +125,20 @@ static int
 ps_dropprivs(struct dhcpcd_ctx *ctx)
 {
 	struct passwd *pw = ctx->ps_user;
+	int fd_out = ctx->options & DHCPCD_DUMPLEASE ?
+	   STDOUT_FILENO : STDERR_FILENO;
 
 	if (ctx->options & DHCPCD_LAUNCHER)
+#ifdef ASAN
+		logwarnx("not chrooting as compiled for ASAN");
+#else
 		logdebugx("chrooting as %s to %s", pw->pw_name, pw->pw_dir);
+
 	if (chroot(pw->pw_dir) == -1 &&
 	    (errno != EPERM || ctx->options & DHCPCD_FORKED))
 		logerr("%s: chroot: %s", __func__, pw->pw_dir);
+#endif
+
 	if (chdir("/") == -1)
 		logerr("%s: chdir: /", __func__);
 
@@ -172,7 +180,7 @@ ps_dropprivs(struct dhcpcd_ctx *ctx)
 	 * Obviously this won't work if we are using a logfile
 	 * or redirecting stderr to a file. */
 	if ((ctx->options & DHC_NOCHKIO) == DHC_NOCHKIO ||
-	    (ctx->logfile == NULL && isatty(STDERR_FILENO) == 1))
+	    (ctx->logfile == NULL && isatty(fd_out) == 1))
 	{
 		if (setrlimit(RLIMIT_FSIZE, &rzero) == -1)
 			logerr("setrlimit RLIMIT_FSIZE");
@@ -408,15 +416,23 @@ ps_startprocess(struct ps_process *psp,
 		return pid;
 	}
 
+	/* If we are not the root process, close un-needed stuff. */
+	if (ctx->ps_root != psp) {
+		ps_root_close(ctx);
 #ifdef PLUGIN_DEV
-	/* If we are not the root process, stop listening to devices. */
-	if (ctx->ps_root != psp)
 		dev_stop(ctx);
 #endif
+	}
 
 	ctx->options |= DHCPCD_FORKED;
 	if (ctx->ps_log_fd != -1)
 		logsetfd(ctx->ps_log_fd);
+
+#ifdef DEBUG_FD
+	logerrx("pid %d log_fd=%d data_fd=%d psp_fd=%d",
+	    getpid(), ctx->ps_log_fd, ctx->ps_data_fd, psp->psp_fd);
+#endif
+
 	eloop_clear(ctx->eloop, -1);
 	eloop_forked(ctx->eloop);
 	eloop_signal_set_cb(ctx->eloop,
@@ -458,18 +474,6 @@ ps_startprocess(struct ps_process *psp,
 		}
 #endif
 	}
-
-	if (ctx->ps_inet != psp)
-		ctx->ps_inet = NULL;
-	if (ctx->ps_ctl != psp)
-		ctx->ps_ctl = NULL;
-
-#if 0
-	char buf[1024];
-	errno = 0;
-	ssize_t xx = recv(psp->psp_fd, buf, sizeof(buf), MSG_PEEK);
-	logerr("pid %d test fd %d recv peek %zd", getpid(), psp->psp_fd, xx);
-#endif
 
 	if (eloop_event_add(ctx->eloop, psp->psp_fd, ELE_READ,
 	    recv_msg, psp) == -1)
@@ -1135,7 +1139,7 @@ ps_recvpsmsg(struct dhcpcd_ctx *ctx, int fd, unsigned short events,
 
 	len = read(fd, &psm, sizeof(psm));
 #ifdef PRIVSEP_DEBUG
-	logdebugx("%s: %zd", __func__, len);
+	logdebugx("%s: fd=%d %zd", __func__, fd, len);
 #endif
 
 	if (len == -1 || len == 0)
@@ -1215,6 +1219,7 @@ ps_newprocess(struct dhcpcd_ctx *ctx, struct ps_id *psid)
 		return NULL;
 	psp->psp_ctx = ctx;
 	memcpy(&psp->psp_id, psid, sizeof(psp->psp_id));
+	psp->psp_fd = -1;
 	psp->psp_work_fd = -1;
 #ifdef HAVE_CAPSICUM
 	psp->psp_pfd = -1;

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Privilege Separation for dhcpcd, network proxy
- * Copyright (c) 2006-2023 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -46,6 +46,8 @@
 #include "ipv6nd.h"
 #include "logerr.h"
 #include "privsep.h"
+
+/* We expect to have open 2 SEQPACKET, 1 udp, 1 udp6 and 1 raw6 fds */
 
 #ifdef INET
 static void
@@ -213,6 +215,7 @@ ps_inet_startcb(struct ps_process *psp)
 	return ret;
 }
 
+#if defined(INET) || defined(DHCP6)
 static bool
 ps_inet_validudp(struct msghdr *msg, uint16_t sport, uint16_t dport)
 {
@@ -231,6 +234,7 @@ ps_inet_validudp(struct msghdr *msg, uint16_t sport, uint16_t dport)
 	}
 	return true;
 }
+#endif
 
 #ifdef INET6
 static bool

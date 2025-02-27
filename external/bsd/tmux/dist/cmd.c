@@ -47,7 +47,6 @@ extern const struct cmd_entry cmd_display_menu_entry;
 extern const struct cmd_entry cmd_display_message_entry;
 extern const struct cmd_entry cmd_display_popup_entry;
 extern const struct cmd_entry cmd_display_panes_entry;
-extern const struct cmd_entry cmd_down_pane_entry;
 extern const struct cmd_entry cmd_find_window_entry;
 extern const struct cmd_entry cmd_has_session_entry;
 extern const struct cmd_entry cmd_if_shell_entry;
@@ -117,7 +116,6 @@ extern const struct cmd_entry cmd_swap_window_entry;
 extern const struct cmd_entry cmd_switch_client_entry;
 extern const struct cmd_entry cmd_unbind_key_entry;
 extern const struct cmd_entry cmd_unlink_window_entry;
-extern const struct cmd_entry cmd_up_pane_entry;
 extern const struct cmd_entry cmd_wait_for_entry;
 
 const struct cmd_entry *cmd_table[] = {
@@ -812,10 +810,14 @@ cmd_mouse_pane(struct mouse_event *m, struct session **sp,
 
 	if ((wl = cmd_mouse_window(m, sp)) == NULL)
 		return (NULL);
-	if ((wp = window_pane_find_by_id(m->wp)) == NULL)
-		return (NULL);
-	if (!window_has_pane(wl->window, wp))
-		return (NULL);
+	if (m->wp == -1)
+		wp = wl->window->active;
+	else {
+		if ((wp = window_pane_find_by_id(m->wp)) == NULL)
+			return (NULL);
+		if (!window_has_pane(wl->window, wp))
+			return (NULL);
+	}
 
 	if (wlp != NULL)
 		*wlp = wl;

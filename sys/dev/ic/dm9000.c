@@ -1,4 +1,4 @@
-/*	$NetBSD: dm9000.c,v 1.36 2023/07/07 07:22:18 martin Exp $	*/
+/*	$NetBSD: dm9000.c,v 1.38 2024/12/01 20:24:23 andvar Exp $	*/
 
 /*
  * Copyright (c) 2009 Paul Fleischer
@@ -227,7 +227,7 @@ dme_attach(struct dme_softc *sc, const uint8_t *notusedanymore)
 		aprint_debug_dev(sc->sc_dev, "got MAC address!\n");
 	} else {
 		/*
-		 * If we did not get an externaly configure address,
+		 * If we did not get an externally configure address,
 		 * try to read one from the current setup, before
 		 * resetting the chip.
 		 */
@@ -244,7 +244,7 @@ dme_attach(struct dme_softc *sc, const uint8_t *notusedanymore)
 			enaddr[5] = machi >> 8;
 		}
 	}
-	/* TODO: perform explicit EEPROM read op if it's availble */
+	/* TODO: perform explicit EEPROM read op if it's available */
 
 	dme_reset(sc);
 

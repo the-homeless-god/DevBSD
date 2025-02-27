@@ -1,4 +1,4 @@
-/*	$NetBSD: riscv_machdep.c,v 1.37 2024/03/05 14:15:34 thorpej Exp $	*/
+/*	$NetBSD: riscv_machdep.c,v 1.42 2025/01/04 14:23:03 skrll Exp $	*/
 
 /*-
  * Copyright (c) 2014, 2019, 2022 The NetBSD Foundation, Inc.
@@ -35,7 +35,7 @@
 #include "opt_riscv_debug.h"
 
 #include <sys/cdefs.h>
-__RCSID("$NetBSD: riscv_machdep.c,v 1.37 2024/03/05 14:15:34 thorpej Exp $");
+__RCSID("$NetBSD: riscv_machdep.c,v 1.42 2025/01/04 14:23:03 skrll Exp $");
 
 #include <sys/param.h>
 
@@ -57,6 +57,10 @@ __RCSID("$NetBSD: riscv_machdep.c,v 1.37 2024/03/05 14:15:34 thorpej Exp $");
 #include <sys/systm.h>
 
 #include <dev/cons.h>
+#ifdef __HAVE_MM_MD_KERNACC
+#include <dev/mm.h>
+#endif
+
 #include <uvm/uvm_extern.h>
 
 #include <riscv/frame.h>
@@ -64,6 +68,7 @@ __RCSID("$NetBSD: riscv_machdep.c,v 1.37 2024/03/05 14:15:34 thorpej Exp $");
 #include <riscv/machdep.h>
 #include <riscv/pte.h>
 #include <riscv/sbi.h>
+#include <riscv/userret.h>
 
 #include <libfdt.h>
 #include <dev/fdt/fdtvar.h>
@@ -206,6 +211,9 @@ md_child_return(struct lwp *l)
 	userret(l);
 }
 
+/*
+ * Process the tail end of a posix_spawn() for the child.
+ */
 void
 cpu_spawn_return(struct lwp *l)
 {
@@ -896,6 +904,44 @@ init_riscv(register_t hartid, paddr_t dtb)
 	if (error)
 		printf("AP startup problems\n");
 }
+
+
+#ifdef __HAVE_MM_MD_KERNACC
+
+#define IN_RANGE_P(addr, start, end)	(start) <= (addr) && (addr) < (end)
+#ifdef _LP64
+#define IN_DIRECTMAP_P(va) \
+	IN_RANGE_P(va, RISCV_DIRECTMAP_START, RISCV_DIRECTMAP_END)
+#else
+#define IN_DIRECTMAP_P(va) false
+#endif
+
+int
+mm_md_kernacc(void *ptr, vm_prot_t prot, bool *handled)
+{
+	extern char __kernel_text[];
+	extern char _end[];
+	extern char __data_start[];
+
+	const vaddr_t kernstart = trunc_page((vaddr_t)__kernel_text);
+	const vaddr_t kernend = round_page((vaddr_t)_end);
+	const vaddr_t data_start = (vaddr_t)__data_start;
+
+	const vaddr_t va = (vaddr_t)ptr;
+
+	*handled = false;
+	if (IN_RANGE_P(va, kernstart, kernend)) {
+		*handled = true;
+		if (va < data_start && (prot & VM_PROT_WRITE) != 0) {
+			return EFAULT;
+		}
+	} else if (IN_DIRECTMAP_P(va)) {
+		*handled = true;
+	}
+
+	return 0;
+}
+#endif
 
 
 #ifdef _LP64

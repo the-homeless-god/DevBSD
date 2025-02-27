@@ -10,4 +10,18 @@
 # information regarding copyright ownership.
 
 from . import check
+from . import instance
 from . import query
+from . import kasp
+from . import name
+from . import rndc
+from . import run
+from . import template
+from . import log
+from . import vars  # pylint: disable=redefined-builtin
+from . import hypothesis
+
+# isctest.mark module is intentionally NOT imported, because it relies on
+# environment variables which might not be set at the time of import of the
+# `isctest` package. To use the marks, manual `import isctest.mark` is needed
+# instead.

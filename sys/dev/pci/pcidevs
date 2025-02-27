@@ -1,4 +1,4 @@
-$NetBSD: pcidevs,v 1.1506 2024/05/12 23:30:07 msaitoh Exp $
+$NetBSD: pcidevs,v 1.1518 2025/01/23 22:33:42 andvar Exp $
 
 /*
  * Copyright (c) 1995, 1996 Christopher G. Demetriou
@@ -545,6 +545,7 @@ vendor FORTEMEDIA	0x1319	Forte Media
 vendor SIIG		0x131f	Siig
 vendor MICROMEMORY	0x1332	Micro Memory
 vendor DOMEX		0x134a	Domex
+vendor BRAINBOXES	0x135a	Brainboxes Ltd
 vendor QUATECH		0x135c	Quatech
 vendor LMC		0x1376	LAN Media
 vendor NETGEAR		0x1385	Netgear
@@ -655,6 +656,7 @@ vendor ZHAOXIN		0x1d17	Zhaoxin
 vendor AQUANTIA		0x1d6a	Aquantia
 vendor ROCKCHIP		0x1d87	Rockchip
 vendor TEKRAM2		0x1de1	Tekram Technology (2nd PCI Vendor ID)
+vendor RASPBERRYPI	0x1de4	Raspberry Pi (Trading) Limited
 vendor AMPERE		0x1def	Ampere Computing
 vendor SUNIX2		0x1fd4	SUNIX Co
 vendor HINT		0x3388	HiNT
@@ -976,6 +978,14 @@ product AMD AMD64_F10_ADDR	0x1201	AMD64 Family10h Address Map Configuration
 product AMD AMD64_F10_DRAM	0x1202	AMD64 Family10h DRAM Configuration
 product AMD AMD64_F10_MISC	0x1203	AMD64 Family10h Miscellaneous Configuration
 product AMD AMD64_F10_LINK	0x1204	AMD64 Family10h Link Configuration
+product AMD F1A_0X_DF_0		0x12c0	1Ah/0xh Data Fabric
+product AMD F1A_0X_DF_1		0x12c1	1Ah/0xh Data Fabric
+product AMD F1A_0X_DF_2		0x12c2	1Ah/0xh Data Fabric
+product AMD F1A_0X_DF_3		0x12c3	1Ah/0xh Data Fabric
+product AMD F1A_0X_DF_4		0x12c4	1Ah/0xh Data Fabric
+product AMD F1A_0X_DF_5		0x12c5	1Ah/0xh Data Fabric
+product AMD F1A_0X_DF_6		0x12c6	1Ah/0xh Data Fabric
+product AMD F1A_0X_DF_7		0x12c7	1Ah/0xh Data Fabric
 product AMD AMD64_F11_HT	0x1300	AMD64 Family11h HyperTransport Configuration
 product AMD AMD64_F11_ADDR	0x1301	AMD64 Family11h Address Map Configuration
 product AMD AMD64_F11_DRAM	0x1302	AMD64 Family11h DRAM Configuration
@@ -1121,9 +1131,23 @@ product AMD F16_MISC		0x1535	Family16h Miscellaneous Configuration
 product AMD F16_RC		0x1536	Family16h Root Complex
 product AMD F16_CCP		0x1537	Family16h Cryptographic Coprocessor
 product AMD F16_HB		0x1538	Family16h Host Bridge
+product AMD F1A_0X_RC		0x153a	1Ah/0xh Root Complex
+product AMD F1A_0X_IOMMU	0x153b	1Ah/0xh IOMMU
+product AMD F1A_0X_PCIE_DUMMY_HB 0x153d	1Ah/0xh PCIe Dummy Host Bridge
+product AMD F1A_0X_GPPB_1	0x153e	1Ah/0xh PCIe GPP Bridge
+product AMD F1A_0X_GPPB_2	0x153f	1Ah/0xh PCIe GPP Bridge
+product AMD F1A_0X_GPPB_3	0x1554	1Ah/0xh PCIe GPP Bridge
+product AMD F1A_0X_INTNL_GPPB	0x1555	1Ah/0xh Internal PCIe GPP Bridge
+product AMD F1A_0X_PCIE_DUMMY	0x1556	1Ah/0xh PCIe Dummy Function
+product AMD F1A_0X_XHCI_0	0x1557	1Ah/0xh USB 3.2 xHCI
+product AMD F1A_0X_SW_US	0x1558	1Ah/0xh SW.US
+product AMD F1A_0X_PCIE_DUMMY_2	0x1559	1Ah/0xh Secondary PCIe Dummy Function
+product AMD F1A_0X_NTB_1	0x155a	1Ah/0xh PCIe Non Transparent Bridge
 product AMD F16_30_RC		0x1566	Family16h Root Complex
 product AMD F16_30_IOMMU	0x1567	Family16h IOMMU
 product AMD F16_30_HB		0x156b	Family16h Host Bridge
+product AMD F1A_0X_SW_DS	0x156c	1Ah/0xh SW.DS
+product AMD F1A_0X_ASP		0x156e	1Ah/0xh ASP
 product AMD F15_6X_PF_0		0x1570	15h/6xh Processor Function 0
 product AMD F15_6X_PF_1		0x1571	15h/6xh Processor Function 1
 product AMD F15_6X_PF_2		0x1572	15h/6xh Processor Function 2
@@ -1493,6 +1517,7 @@ product ARECA ARC1203		0x1203	ARC-1203
 product ARECA ARC1210		0x1210	ARC-1210
 product ARECA ARC1214 		0x1214	ARC-1214
 product ARECA ARC1220		0x1220	ARC-1220
+product ARECA ARC1224		0x1224	ARC-1224
 product ARECA ARC1230		0x1230	ARC-1230
 product ARECA ARC1260		0x1260	ARC-1260
 product ARECA ARC1270		0x1270	ARC-1270
@@ -2505,6 +2530,89 @@ product BIT3 PCIVME2706		0x0300	PCI-VME Interface Mod. 2706
 /* Bluesteel Networks */
 product BLUESTEEL 5501		0x0000	5501
 product BLUESTEEL 5601		0x5601	5601
+
+/* Brainboxes products */
+product BRAINBOXES UC268	0x0841	Brainboxes UC-268
+product BRAINBOXES UC257	0x0861	Brainboxes UC-257
+product BRAINBOXES UC257R3	0x0862	Brainboxes UC-257
+product BRAINBOXES UC257R4	0x0863	Brainboxes UC-257
+product BRAINBOXES UC279	0x0881	Brainboxes UC-279
+product BRAINBOXES UC313	0x08a1	Brainboxes UC-313
+product BRAINBOXES UC313R3	0x08a2	Brainboxes UC-313
+product BRAINBOXES UC313R4	0x08a3	Brainboxes UC-313
+product BRAINBOXES UC310	0x08c1	Brainboxes UC-310
+product BRAINBOXES UC302	0x08e1	Brainboxes UC-302
+product BRAINBOXES UC302R3	0x08e2	Brainboxes UC-302
+product BRAINBOXES UC302R4	0x08e3	Brainboxes UC-302
+product BRAINBOXES UC431	0x0901	Brainboxes UC-431
+product BRAINBOXES UC420	0x0921	Brainboxes UC-420
+product BRAINBOXES UC475	0x0981	Brainboxes UC-475
+product BRAINBOXES UC475R3	0x0982	Brainboxes UC-475
+product BRAINBOXES UC607	0x09a1	Brainboxes UC-607
+product BRAINBOXES UC607R3	0x09a2	Brainboxes UC-607
+product BRAINBOXES UC607R4	0x09a3	Brainboxes UC-607
+product BRAINBOXES UC324	0x0a61	Brainboxes UC-324
+product BRAINBOXES UC357	0x0a81	Brainboxes UC-357
+product BRAINBOXES UC357R3	0x0a82	Brainboxes UC-357
+product BRAINBOXES UC357R4	0x0a83	Brainboxes UC-357
+product BRAINBOXES UC246	0x0aa1	Brainboxes UC-246
+product BRAINBOXES UC246R3	0x0aa2	Brainboxes UC-246
+product BRAINBOXES UP189	0x0ac1	Brainboxes UP-189
+product BRAINBOXES UP189R3	0x0ac2	Brainboxes UP-189
+product BRAINBOXES UP189R4	0x0ac3	Brainboxes UP-189
+product BRAINBOXES UC346	0x0b01	Brainboxes UC-346
+product BRAINBOXES UC346R3	0x0b02	Brainboxes UC-346
+product BRAINBOXES UP200	0x0b21	Brainboxes UP-200
+product BRAINBOXES UP200R3	0x0b22	Brainboxes UP-200
+product BRAINBOXES UP200R4	0x0b23	Brainboxes UP-200
+product BRAINBOXES UC101	0x0ba1	Brainboxes UC-101
+product BRAINBOXES UC203	0x0bc1	Brainboxes UC-203
+product BRAINBOXES UC203R3	0x0bc2	Brainboxes UC-203
+product BRAINBOXES UP869	0x0c01	Brainboxes UP-869
+product BRAINBOXES UP869R3	0x0c02	Brainboxes UP-869
+product BRAINBOXES UP869R4	0x0c03	Brainboxes UP-869
+product BRAINBOXES UP880	0x0c21	Brainboxes UP-880
+product BRAINBOXES UP880R3	0x0c22	Brainboxes UP-880
+product BRAINBOXES UP880R4	0x0c23	Brainboxes UP-880
+product BRAINBOXES UC368	0x0c41	Brainboxes UC-368
+product BRAINBOXES UC253	0x0ca1	Brainboxes UC-253
+product BRAINBOXES UC260	0x0d21	Brainboxes UC-260
+product BRAINBOXES UC836	0x0d41	Brainboxes UC-836
+product BRAINBOXES IS100	0x0d60	Intashield IS-100
+product BRAINBOXES IS200	0x0d80	Intashield IS-200
+product BRAINBOXES IS300	0x0da0	Intashield IS-300
+product BRAINBOXES IS400	0x0dc0	Intashield IS-400
+product BRAINBOXES PX279	0x0e41	Brainboxes PX-279
+product BRAINBOXES UC414	0x0e61	Brainboxes UC-414
+product BRAINBOXES PX420	0x4000	Brainboxes PX-420
+product BRAINBOXES PX431	0x4001	Brainboxes PX-431
+product BRAINBOXES PX820	0x4002	Brainboxes PX-820
+product BRAINBOXES PX831	0x4003	Brainboxes PX-831
+product BRAINBOXES PX246	0x4004	Brainboxes PX-246
+product BRAINBOXES PX101	0x4005	Brainboxes PX-101
+product BRAINBOXES PX257	0x4006	Brainboxes PX-257
+product BRAINBOXES PX846	0x4008	Brainboxes PX-846
+product BRAINBOXES PX857	0x4009	Brainboxes PX-857
+product BRAINBOXES PX260	0x400a	Brainboxes PX-260
+product BRAINBOXES PX320	0x400b	Brainboxes PX-320
+product BRAINBOXES PX313	0x400c	Brainboxes PX-313
+product BRAINBOXES PX310	0x400e	Brainboxes PX-310
+product BRAINBOXES PX346	0x400f	Brainboxes PX-346
+product BRAINBOXES PX368	0x4010	Brainboxes PX-368
+product BRAINBOXES PX420R3	0x4011	Brainboxes PX-420
+product BRAINBOXES PX431R3	0x4012	Brainboxes PX-431
+product BRAINBOXES PX820R3	0x4013	Brainboxes PX-820
+product BRAINBOXES PX831R3	0x4014	Brainboxes PX-831
+product BRAINBOXES PX257R3	0x4015	Brainboxes PX-257
+product BRAINBOXES PX246R3	0x4016	Brainboxes PX-246
+product BRAINBOXES PX846R3	0x4017	Brainboxes PX-846
+product BRAINBOXES PX857R3	0x4018	Brainboxes PX-857
+product BRAINBOXES PX101R3	0x4019	Brainboxes PX-101
+product BRAINBOXES PX475	0x401d	Brainboxes PX-475
+product BRAINBOXES PX803	0x401e	Brainboxes PX-803
+product BRAINBOXES IX100	0x4027	Intashield IX-100
+product BRAINBOXES IX200	0x4028	Intashield IX-200
+product BRAINBOXES IX400	0x4029	Intashield IX-400
 
 /* Broadcom products */
 product BROADCOM BCM5752	0x1600	BCM5752 NetXtreme 1000baseT Ethernet
@@ -5026,6 +5134,7 @@ product INTEL 63XXESB_HDA	0x269a	63xxESB High Definition Audio Controller
 product INTEL 63XXESB_SMB	0x269b	63xxESB SMBus Controller
 product INTEL 63XXESB_IDE	0x269e	63xxESB IDE Controller
 product INTEL SNR_DLB		0x270b	Snow Ridge DLB 1.0
+product INTEL WIFI7		0x272b  Wi-Fi 7
 product INTEL 82945P_MCH	0x2770	82945G/P Memory Controller Hub
 product INTEL 82945P_EXP	0x2771	82945G/P PCI Express Bridge
 product INTEL 82945P_IGD	0x2772	82945G/P Integrated Graphics Device
@@ -6312,6 +6421,26 @@ product INTEL I219_LM20		0x550e	I219-LM (20) Ethernet Connection
 product INTEL I219_V20		0x550f	I219-V (20) Ethernet Connection
 product INTEL I219_LM21		0x5510	I219-LM (21) Ethernet Connection
 product INTEL I219_V21		0x5511	I219-V (21) Ethernet Connection
+product INTEL ARC_A770M		0x5690	Arc A770M Graphics
+product INTEL ARC_A730M		0x5691	Arc A730M Graphics
+product INTEL ARC_A550M		0x5692	Arc A550M Graphics
+product INTEL ARC_A370M		0x5693	Arc A370M Graphics
+product INTEL ARC_A350M		0x5694	Arc A350M Graphics
+product INTEL ARC_A570M		0x5696	Arc A570M Graphics
+product INTEL ARC_A530M		0x5697	Arc A530M Graphics
+product INTEL ARC_A770		0x56A0	Arc A770 Graphics
+product INTEL ARC_A750		0x56A1	Arc A750 Graphics
+product INTEL ARC_A580		0x56A2	Arc A580 Graphics
+product INTEL ARC_A380		0x56A5	Arc A380 Graphics
+product INTEL ARC_A310		0x56A6	Arc A310 Graphics
+product INTEL ARC_PRO_A30M	0x56B0	Arc Pro A30M Graphics
+product INTEL ARC_PRO_A40	0x56B1	Arc Pro A40/A50 Graphics
+product INTEL ARC_PRO_A60M	0x56B2	Arc Pro A60M Graphics
+product INTEL ARC_PRO_A60	0x56B3	Arc Pro A60 Graphics
+product INTEL ARC_A810E		0x56BA	Arc A810E Graphics
+product INTEL ARC_A310E		0x56BB	Arc A310E Graphics
+product INTEL ARC_A370E		0x56BC	Arc A370E Graphics
+product INTEL ARC_A350E		0x56BD	Arc A350E Graphics
 product INTEL CORE7G_H_M_D_HOST_DRAM 0x5900 Core 7G (H, Mobile, Dual) Host Bridge, DRAM
 product INTEL CORE7G_PCIE_X16	0x5901	Core 7G PCIe x16
 product INTEL CORE7G_S_GT1	0x5902	HD Graphics 610 (GT1)
@@ -6381,6 +6510,7 @@ product INTEL APL_LPC		0x5ae8	Apollo Lake LPC
 product INTEL APL_SSRAM		0x5aec	Apollo Lake Shared SRAM
 product INTEL APL_UART_3	0x5aee	Apollo Lake UART 3
 product INTEL APL_HB		0x5af0	Apollo Lake Host Bridge
+product INTEL NPU_LNL		0x643e  Lunar Lake NPU
 product INTEL XEOND_HB_DMI2	0x6f00	Core i7-6xxxK/Xeon-D Host Bridge (DMI2)
 product INTEL XEOND_HB_PCIE	0x6f01	Xeon-D Host Bridge (PCIe)
 product INTEL XEOND_PCIE_1	0x6f02	Xeon-D PCIe Root Port (x8 or x4 max)
@@ -6643,6 +6773,17 @@ product INTEL 6HS_H_GSPI_2	0x7afb	600 Series PCH-H GSPI 2
 product INTEL 6HS_H_I2C_4	0x7afc	600 Series PCH-H I2C 4
 product INTEL 6HS_H_I2C_5	0x7afd	600 Series PCH-H I2C 5
 product INTEL 6HS_H_UART_2	0x7afe	600 Series PCH-H UART 2
+product INTEL VMD_MTL		0x7d0b  Volume Management Device
+product INTEL NPU_MTL		0x7d1d  Meteor Lake NPU
+product INTEL LPC_MTL		0x7e02	Meteor Lake LPC/ISA Bridge
+product INTEL PCH_MTL		0x7d14	Meteor Lake PCH
+product INTEL SMBUS_MTL		0x7e22  Meteor Lake SMbus
+product INTEL SPI_MTL		0x7e23  Meteor Lake SPI Controller
+product INTEL ARCG_MTL		0x7d55	Meteor Lake Arc Graphics
+product INTEL AHCI_MTL		0x7e63	Meteor Lake AHCI Controller
+product INTEL USB32_MTL		0x7e7d	Meteor Lake USB 3.2 Gen 2x1 xHCI Host Controller
+product INTEL MPM_MTL		0x7e7f	Meteor Lake Memory Power Management
+product INTEL TB4USB_MTL	0x7ec0	Meteor Lake Thunderbolt 4 USB Controller
 product INTEL SCH_IDE		0x811a  SCH IDE Controller
 product INTEL E600_HDA		0x811b	E600 HD Audio
 product INTEL E600_PCIB_0	0x8180	E600 Virtual PCI-PCI Bridge
@@ -7479,6 +7620,8 @@ product INTEL RPL_IGD_9		0xa7a9	Raptor Lake Graphics (64 or 48EU)
 product INTEL RPL_IGD_10	0xa7aa	Raptor Lake Graphics (96 or 80EU)
 product INTEL RPL_IGD_11	0xa7ac	Raptor Lake Graphics (96 or 80EU)
 product INTEL RPL_IGD_12	0xa7ad	Raptor Lake Graphics (64EU)
+product INTEL NPU_ARL		0xad1d  Arrow Lake NPU
+product INTEL NPU_PTL		0xb03e  Panther Lake NPU
 product INTEL 21152		0xb152	S21152BB PCI-PCI Bridge
 product INTEL 21154		0xb154	S21152BA,S21154AE/BE PCI-PCI Bridge
 product INTEL 21555		0xb555	21555 Non-Transparent PCI-PCI Bridge
@@ -7715,7 +7858,13 @@ product MICREL KSZ8841		0x8841	10/100 Ethernet
 product MICREL KSZ8842		0x8842	Switched 2 Port 10/100 Ethernet
 
 /* Micron/Crucial Technology products */
-product MICRON SM2263		0x2263	SM2263 NVMe Controller
+product MICRON P1		0x2263	P1 NVMe SSD
+product MICRON P1_1		0x5403	P1 NVMe SSD
+product MICRON P5PLUS		0x5407	P5 Plus NVMe SSD
+product MICRON P2P3P3P		0x540a	P2 / P3 / P3 Plus NVMe SSD
+product MICRON P5		0x5412	P5 NVMe SSD
+product MICRON T500		0x5415	T500 NVMe SSD
+product MICRON T700		0x5419	T700 NVMe SSD
 
 /* Middle Digital products */
 product MIDDLE_DIGITAL WEASEL_VGA	0x9050	Weasel Virtual VGA
@@ -8455,7 +8604,45 @@ product NVIDIA	GF100_HDA	0x0be5	GF100 HD Audio
 product NVIDIA	GF108_HDA	0x0bea	GF108 HD Audio
 product NVIDIA	GF116_HDA	0x0bee	GF116 HD Audio
 product NVIDIA	GF_440		0x0de0	GeForce GT 440
+product NVIDIA	GF_GT630	0x0f00	GeForce GT 630
+product NVIDIA	GF_GT620	0x0f01	GeForce GT 620
+product NVIDIA	GF_GT730_4	0x0f02	GeForce GT 730
+product NVIDIA	GF_GT640_1	0x0fc0	GeForce GT 640
+product NVIDIA	GF_GT640_2	0x0fc1	GeForce GT 640
+product NVIDIA	GF_GT630_2	0x0fc2	GeForce GT 630
+product NVIDIA	GF_GTX650	0x0fc6	GeForce GTX 650
+product NVIDIA	GF_GT740	0x0fc8	GeForce GT 740
+product NVIDIA	GF_GT730_3	0x0fc9	GeForce GT 730
+product NVIDIA	GF_GT755M	0x0fcd	GeForce GT 755M
+product NVIDIA	GF_GT640M_LE	0x0fce	GeForce GT 640M LE
+product NVIDIA	GF_GT650M	0x0fd1	GeForce GT 650M
 product NVIDIA	GF_GT640M	0x0fd2	GeForce GT 640M
+product NVIDIA	GF_GT640M_LE_2	0x0fd3	GeForce GT 640M LE
+product NVIDIA	GF_GTX660M	0x0fd4	GeForce GTX 660M
+product NVIDIA	GF_GT650M_2	0x0fd5	GeForce GT 650M
+product NVIDIA	GF_GT640M_2	0x0fd8	GeForce GT 640M
+product NVIDIA	GF_GT645M	0x0fd9	GeForce GT 645M
+product NVIDIA	GF_GT740M_2	0x0fdf	GeForce GT 740M
+product NVIDIA	GF_GTX660M_2	0x0fe0	GeForce GTX 660M
+product NVIDIA	GF_GT730M_2	0x0fe1	GeForce GT 730M
+product NVIDIA	GF_GT745M	0x0fe2	GeForce GT 745M
+product NVIDIA	GF_GT745M_2	0x0fe3	GeForce GT 745M
+product NVIDIA	GF_GT750M	0x0fe4	GeForce GT 750M
+product NVIDIA	GF_GT750M_2	0x0fe9	GeForce GT 750M
+product NVIDIA	GF_GT755M_2	0x0fea	GeForce GT 755M
+product NVIDIA	GF_GT710A	0x0fec	GeForce 710A
+product NVIDIA	GRID_K340	0x0fef	GRID K340
+product NVIDIA	GRID_K1		0x0ff2	GRID K1
+product NVIDIA	QUADRO_K420	0x0ff3	Quadro K420
+product NVIDIA	QUADRO_K1100M	0x0ff6	Quadro K1100M
+product NVIDIA	QUADRO_K500M	0x0ff8	Quadro K500M
+product NVIDIA	QUADRO_K2000D	0x0ff9	Quadro K2000D
+product NVIDIA	QUADRO_K600	0x0ffa	Quadro K600
+product NVIDIA	QUADRO_K2000M	0x0ffb	Quadro K2000M
+product NVIDIA	QUADRO_K1000M	0x0ffc	Quadro K1000M
+product NVIDIA	QUADRO_NVS510	0x0ffd	NVS 510
+product NVIDIA	QUADRO_K2000	0x0ffe	Quadro K2000
+product NVIDIA	QUADRO_410	0x0fff	Quadro 410
 product NVIDIA	GT520		0x1040	GeForce GT 520
 product NVIDIA	GEFORCE_510	0x1042	GeForce 510
 product NVIDIA	GEFORCE_605	0x1048	GeForce 605
@@ -8821,13 +9008,20 @@ product OXFORDSEMI OX16PCI958	0x9538	OX16PCI958
 product OXFORDSEMI OXPCIE952_0	0xc101	OXPCIe952
 product OXFORDSEMI OXPCIE952_1	0xc105	OXPCIe952
 product OXFORDSEMI OXPCIE952P	0xc110	OXPCIe952 Parallel
+product OXFORDSEMI OXPCIE952SN1 0xc11b	OXPCIe952 1 Native Serial
 product OXFORDSEMI OXPCIE952_2S	0xc120	OXPCIe952 2 Serial
 product OXFORDSEMI OXPCIE952_2	0xc124	OXPCIe952
+product OXFORDSEMI OXPCIE952SN1_2 0xc138 OXPCIe952 1 Native Serial
 product OXFORDSEMI OXPCIE952_3	0xc140	OXPCIe952
 product OXFORDSEMI OXPCIE952_4	0xc141	OXPCIe952
 product OXFORDSEMI OXPCIE952_5	0xc144	OXPCIe952
 product OXFORDSEMI OXPCIE952_6	0xc145	OXPCIe952
+product OXFORDSEMI OXPCIE952SN2 0xc158	OXPCIe952 2 Native Serial
+product OXFORDSEMI OXPCIE952SN2_2 0xc15d OXPCIe952 2 Native Serial
 product OXFORDSEMI OXPCIE954	0xc208	OXPCIe954
+product OXFORDSEMI OXPCIE954SN4	0xc20d	OXPCIe954 4 Native Serial
+product OXFORDSEMI OXPCIE958	0xc308	OXPCIe958
+product OXFORDSEMI OXPCIE958SN8	0xc30d	OXPCIe958 8 Native Serial
 
 /* Packet Engines products */
 product PACKETENGINES GNICII	0x0911	G-NIC II Ethernet
@@ -9167,6 +9361,9 @@ product RALINK	RT5390_5	0x539f	RT5390
 /* RATOC Systems products */
 product RATOC	REXPCI31	0x0853	REX PCI-31/33 SCSI
 
+/* Raspberry Pi (Trading) Limited */
+product RASPBERRYPI	RP1_ETH	0x0001	RP1 PCIe 2.0 South Bridge Ethernet
+
 /* RDC Semiconductor products */
 product RDC	R1010_IDE	0x1010	R1010 IDE Controller
 product RDC	R1011_IDE	0x1011	R1011 IDE Controller
@@ -9212,6 +9409,7 @@ product REALTEK RT8029		0x8029	8029 Ethernet
 product REALTEK RT8139D		0x8039	8139D 10/100 Ethernet
 product REALTEK RT8100		0x8100	8100 10/100 Ethernet
 product REALTEK RT8125		0x8125	8125 10/100/1G/2.5G Ethernet
+product REALTEK RT8126		0x8126	8126 10/100/1G/2.5G/5G Ethernet
 product REALTEK RT8129		0x8129	8129 10/100 Ethernet
 product REALTEK RT8101E		0x8136	8100E/8101E/8102E 10/100 Ethernet
 product REALTEK RT8138		0x8138	8138 10/100 Ethernet
@@ -9936,6 +10134,7 @@ product VIATECH CHROME9_HC	0x3371	Chrome9 HC IGP
 product VIATECH VT8237S_ISA	0x3372	VT8237S PCI-ISA Bridge
 product VIATECH VT8237A_PPB	0x337a	VT8237A PCI-PCI Bridge
 product VIATECH VT8237A_HB	0x337b	VT8237A Host Bridge
+product VIATECH VT8261		0x3402	VT8261 PCI-ISA Bridge
 product VIATECH VX900_DRAM	0x3410	VX900 DRAM Controller
 product VIATECH VL80x_XHCI 	0x3432	VL80x xHCI
 product	VIATECH	VL805_XHCI	0x3483	VL805 xHCI
@@ -9976,7 +10175,9 @@ product VIATECH VT8501AGP	0x8501	VT8501 (Apollo MVP4) CPU-AGP Bridge
 product VIATECH VT82C597AGP	0x8597	VT82C597 (Apollo VP3) CPU-AGP Bridge
 product VIATECH VT82C598AGP	0x8598	VT82C598 (Apollo MVP3) CPU-AGP Bridge
 product VIATECH VT8605AGP	0x8605	VT8605 (Apollo ProMedia 133) Host-AGP Bridge
+product VIATECH VT8261_SATA	0x9000	VT8261 Integrated SATA Controller
 product VIATECH VX900_IDE	0x9001	VX900 IDE Controller
+product VIATECH VT8261_RAID	0x9040	VT8261 Integrated SATA Controller (RAID mode)
 product VIATECH K8T890_PPB_A238	0xa238	K8T890 PCI-PCI Bridge
 product VIATECH VX800_0		0xa353	VX8xx/VX900 South-North Module Interface Control
 product VIATECH P4M900_PPB_1	0xa364	CN896/P4M900 PCI-PCI Bridge

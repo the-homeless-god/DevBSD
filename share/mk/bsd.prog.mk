@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.prog.mk,v 1.349 2024/05/06 08:43:37 mrg Exp $
+#	$NetBSD: bsd.prog.mk,v 1.355 2025/01/28 20:34:55 christos Exp $
 #	@(#)bsd.prog.mk	8.2 (Berkeley) 4/2/94
 
 .ifndef HOSTPROG
@@ -91,7 +91,6 @@ _LIBLIST=\
 	asn1 \
 	atf_c \
 	atf_cxx \
-	bind9 \
 	blocklist \
 	bluetooth \
 	bsdmalloc \
@@ -192,7 +191,7 @@ _LIBLIST=\
 	wind \
 	wrap \
 	y \
-	z 
+	z
 
 .for _lib in ${_LIBLIST}
 .ifndef LIB${_lib:tu}
@@ -244,10 +243,11 @@ PAM_STATIC_DPADD=
 
 #	NB:	If you are a library here, add it in bsd.README
 #	This list is sorted with -f so that it matches the order in bsd.README
-_X11LIBLIST= dps fntstubs fontcache fontconfig fontenc freetype FS GL GLU \
-    ICE lbxutil SM X11 X11_xcb Xau Xaw xcb xcvt Xdmcp Xext Xfont Xfont2 Xft Xi \
+_X11LIBLIST= dps EGL fntstubs fontcache fontconfig fontenc freetype FS GL GLU \
+    GLw I810XvMC  ICE IntelXvMC lbxutil SM X11 X11_xcb Xres Xau Xau7 Xaw xcb \
+    Xcomposite Xcursor xcvt Xdamage Xdmcp Xext Xfixes Xfont Xfont2 Xft Xi \
     Xinerama xkbfile Xmu Xmuu Xpm Xrandr Xrender Xss Xt XTrap Xtst Xv Xxf86dga \
-    Xxf86misc Xxf86vm Xcomposite Xdamage Xfixes
+    Xxf86misc Xxf86vm
 _XCBLIBLIST= \
     atom aux composite damage dpms dri2 dri3 event glx icccm image keysyms \
     present property randr record render_util render reply res screensaver \
@@ -383,25 +383,25 @@ PROGS=		${PROG}
 
 ##### Libraries that this may depend upon.
 .if defined(PROGDPLIBS) 						# {
-.for _lib _dir in ${PROGDPLIBS}
-.if !defined(BINDO.${_lib})
-PROGDO.${_lib}!=	cd "${_dir}" && ${PRINTOBJDIR}
-.MAKEOVERRIDES+=PROGDO.${_lib}
-.endif
-.if defined(PROGDPLIBSSTATIC)
-DPADD+=		${PROGDO.${_lib}}/lib${_lib}.a
-LDADD+=		${PROGDO.${_lib}}/lib${_lib}.a
-.else
-LDADD+=		-L${PROGDO.${_lib}} -l${_lib}
-.if exists(${PROGDO.${_lib}}/lib${_lib}_pic.a)
-DPADD+=		${PROGDO.${_lib}}/lib${_lib}_pic.a
-.elif exists(${PROGDO.${_lib}}/lib${_lib}.so)
-DPADD+=		${PROGDO.${_lib}}/lib${_lib}.so
-.else
-DPADD+=		${PROGDO.${_lib}}/lib${_lib}.a
-.endif
-.endif
-.endfor
+.  for _lib _dir in ${PROGDPLIBS}
+.    if !defined(LIBDO.${_lib})
+LIBDO.${_lib}!=	cd "${_dir}" && ${PRINTOBJDIR}
+.MAKEOVERRIDES+=LIBDO.${_lib}
+.    endif
+.    if defined(PROGDPLIBSSTATIC)
+DPADD+=		${LIBDO.${_lib}}/lib${_lib}.a
+LDADD+=		${LIBDO.${_lib}}/lib${_lib}.a
+.    else
+LDADD+=		-L${LIBDO.${_lib}} -l${_lib}
+.      if exists(${LIBDO.${_lib}}/lib${_lib}_pic.a)
+DPADD+=		${LIBDO.${_lib}}/lib${_lib}_pic.a
+.      elif exists(${LIBDO.${_lib}}/lib${_lib}.so)
+DPADD+=		${LIBDO.${_lib}}/lib${_lib}.so
+.      else
+DPADD+=		${LIBDO.${_lib}}/lib${_lib}.a
+.      endif
+.    endif
+.  endfor
 .endif									# }
 
 LDADD+=${LDADD_AFTER}

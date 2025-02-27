@@ -1,6 +1,6 @@
 .\" SPDX-License-Identifier: BSD-2-Clause
 .\"
-.\" Copyright (c) 2006-2023 Roy Marples
+.\" Copyright (c) 2006-2025 Roy Marples
 .\" All rights reserved
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -24,7 +24,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.Dd December 18, 2023
+.Dd February 24, 2025
 .Dt DHCPCD.CONF 5
 .Os
 .Sh NAME
@@ -305,6 +305,10 @@ You can use this option to stop this from happening.
 .It Ic fallback Ar profile
 Fall back to using this profile if DHCP fails.
 This allows you to configure a static profile instead of using ZeroConf.
+.It Ic fallback_time Ar seconds
+Start fallback after
+.Ar seconds .
+The default is 5 seconds.
 .It Ic hostname Ar name
 Sends the hostname
 .Ar name
@@ -442,6 +446,13 @@ encodes the FQDN hostname as specified in
 .It Ic interface Ar interface
 Subsequent options are only parsed for this
 .Ar interface .
+Pattern matching is allowed by
+.Xr fnmatch 3 .
+.It Ic ipv4ll_time Ar seconds
+Wait for
+.Ar seconds
+before starting IPv4LL.
+The default is 5 seconds.
 .It Ic ipv6ra_autoconf
 Generate SLAAC addresses for each Prefix advertised by an IPv6
 Router Advertisement message with the Auto flag set.
@@ -462,6 +473,17 @@ always fork on a RA.
 Enables IPv6 Router Advertisement solicitation.
 This is on by default, but is documented here in the case where it is disabled
 globally but needs to be enabled for one interface.
+.It Ic lastlease
+If
+.Nm dhcpcd
+cannot obtain a lease, then try to use the last lease acquired for the
+interface.
+.It Ic lastleaseextend
+Same as the above, but the lease will be retained even if it expires.
+.Nm dhcpcd
+will give it up if any other host tries to claim it for their own via ARP.
+This violates RFC 2131, section 3.7, which states the lease should be
+dropped once it has expired.
 .It Ic leasetime Ar seconds
 Request DHCP a lease time of
 .Ar seconds .
@@ -510,6 +532,8 @@ adding a new IPv4 address.
 .It Ic noarp
 Don't send any ARP requests.
 This also disables IPv4LL.
+.It Ic arp_persistdefence
+Keep the IP address even if defence fails upon IP Address conflict.
 .It Ic noauthrequired
 Don't require authentication even though we requested it.
 Also allows FORCERENEW and RECONFIGURE messages without authentication.
@@ -554,6 +578,8 @@ Don't solicit or accept IPv6 Router Advertisements.
 .It Ic nolink
 Don't receive link messages about carrier status.
 You should only set this for buggy interface drivers.
+.It Ic nosyslog
+Disable writing to syslog(3).
 .It Ic noup
 Don't bring the interface up when in manager mode.
 .It Ic option Ar option
@@ -647,6 +673,11 @@ Use
 .Ar script
 instead of the default
 .Pa /libexec/dhcpcd-run-hooks .
+.It Ic request_time Ar seconds
+Request the lease for
+.Ar seconds
+before going back to DISCOVER.
+The default is 180 seconds.
 .It Ic ssid Ar ssid
 Subsequent options are only parsed for this wireless
 .Ar ssid .
@@ -739,7 +770,7 @@ It should only be used for Microsoft DHCP servers and the
 should be set to "MSFT 98" or "MSFT 5.0".
 This option is not RFC compliant.
 .It Ic vendor Ar code , Ns Ar value
-Add an encapsulated vendor option.
+Add an encapsulated vendor-specific information option (DHCP Option 43).
 .Ar code
 should be between 1 and 254 inclusive.
 To add a raw vendor string, omit
@@ -755,6 +786,40 @@ Set the vendor option 03 with an IP address as a string.
 .D1 vendor 03,\e"192.168.0.2\e"
 Set un-encapsulated vendor option to hello world.
 .D1 vendor ,"hello world"
+.It Ic vsio Ar en Ar code, Ns Ar value
+Add an encapsulated vendor-specific information option (DHCP Option 125) with
+IANA assigned Enterprise Number
+.Ar en
+proceeding with the
+.Ar code
+which should be between 1 and 255 inclusive, and the
+.Ar value
+after the comma.
+Examples:
+.Pp
+Set the vsio for enterprise number 155 option 01 with an IPv4 address.
+.D1 vsio 155 01,192.168.1.1
+Set the vsio for enterprise number 155 option 02 with a string.
+.D1 vsio 155 02,"hello world"
+Set the vsio for enterprise number 255 option 01 with a hex code.
+.D1 vsio 255 01,01:02:03:04:05
+.It Ic vsio6 Ar en Ar code, Ns Ar value
+Add an encapsulated vendor-specific information option (DHCPv6 Option 17) with
+IANA assigned Enterprise Number
+.Ar en
+proceeding with the
+.Ar code
+which should be between 1 and 65535 inclusive, and the
+.Ar value
+after the comma.
+Examples:
+.Pp
+Set the vsio for enterprise number 155 option 01 with an IPv6 address.
+.D1 vsio6 155 01,2001:0db8:85a3:0000:0000:8a2e:0370:7334
+Set the vsio for enterprise number 155 option 02 with a string.
+.D1 vsio6 155 02,"hello world"
+Set the vsio for enterprise number 255 option 01 with a hex code.
+.D1 vsio6 255 01,01:02:03:04:05
 .It Ic vendorclassid Ar string
 Set the DHCP Vendor Class.
 DHCPv6 has its own option as shown below.

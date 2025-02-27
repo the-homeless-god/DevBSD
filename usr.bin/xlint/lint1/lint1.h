@@ -1,4 +1,4 @@
-/* $NetBSD: lint1.h,v 1.227 2024/05/11 16:12:28 rillig Exp $ */
+/* $NetBSD: lint1.h,v 1.233 2025/02/20 20:33:10 rillig Exp $ */
 
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All Rights Reserved.
@@ -78,6 +78,12 @@ typedef struct {
 	bool tq_atomic;
 } type_qualifiers;
 
+typedef struct {
+	bool used;
+	bool noreturn;
+	unsigned bit_width;
+} type_attributes;
+
 /* A bool, integer or floating-point value. */
 typedef struct {
 	tspec_t	v_tspec;
@@ -131,6 +137,7 @@ struct lint1_type {
 	bool	t_volatile:1;
 	bool	t_proto:1;	/* function prototype (u.params valid) */
 	bool	t_vararg:1;	/* prototype with '...' */
+	bool	t_noreturn:1;	/* function never returns normally */
 	bool	t_typedef:1;	/* type defined with typedef */
 	bool	t_typeof:1;	/* type defined with GCC's __typeof__ */
 	bool	t_bitfield:1;
@@ -362,6 +369,7 @@ typedef struct decl_level {
 	bool	d_asm:1;	/* set if d_ctx == AUTO and asm() present */
 	bool	d_packed:1;
 	bool	d_used:1;
+	bool	d_noreturn:1;	/* function never returns normally */
 	type_t	*d_tag_type;	/* during a member or enumerator declaration,
 				 * the tag type to which the member belongs */
 	sym_t	*d_func_params;	/* during a function declaration, the
@@ -380,6 +388,9 @@ typedef struct {
 	sym_t	*first;
 	bool	vararg:1;
 	bool	prototype:1;
+	bool	used:1;
+	bool	noreturn:1;
+	bool	identifier:1;
 } parameter_list;
 
 /*

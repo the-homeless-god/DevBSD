@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile.bootimage,v 1.37 2024/05/18 02:03:17 christos Exp $
+#	$NetBSD: Makefile.bootimage,v 1.45 2025/02/02 03:19:37 tsutsui Exp $
 #
 # Copyright (c) 2009, 2010, 2011 Izumi Tsutsui.  All rights reserved.
 #
@@ -54,9 +54,9 @@
 #	USE_SUNLABEL
 #		set yes if target disk image requires Sun's label
 #		(default: no)
-#	INSTALLBOOT_AFTER_DISKLABEL (untested)
+#	INSTALLBOOT_AFTER_DISKLABEL
 #		set yes if the target ${MACHINE} requires disklabel
-#		to run installboot(8), like hp300
+#		to run installboot(8), like hp300 and vax
 #		(default: empty)
 #	IMAGEMB
 #		target image size in MB
@@ -113,6 +113,9 @@
 #	IMGMAKEFSOPTIONS
 #		options passed to makefs(8) to create root file system
 #		(default: -o bsize=16384,fsize=2048,density=8192)
+#	IMGFFSVERSION
+#		version of FFS created by makefs(8)
+#		(default: 1)
 #	INSTALLBOOTOPTIONS
 #		options passed to installboot(8), e.g., -o console=com0
 #		(default: empty)
@@ -244,7 +247,10 @@ SWAPDISK_UUID=`${TOOL_GPT} ${GPT_TIMESTAMP} ${WORKMBR} show -i 3 | ${TOOL_AWK} '
 #
 # definitions to create root fs
 #
-SETS_DEFAULT=	modules base etc comp games gpufw man misc rescue tests text
+SETS_DEFAULT=	modules base etc comp games gpufw man misc rescue text
+.if ${MKATF} != "no"
+SETS_DEFAULT+=	tests
+.endif
 .if ${MKCOMPAT} != "no"
 SETS_DEFAULT+=	base32
 .endif
@@ -268,6 +274,7 @@ FSTAB_IN?=	${DISTRIBDIR}/common/bootimage/fstab.in
 SPEC_IN?=	${DISTRIBDIR}/common/bootimage/spec.in
 
 IMGMAKEFSOPTIONS?=	-o bsize=16384,fsize=2048,density=8192
+IMGFFSVERSION?=		1
 FATMAKEFSOPTIONS?=	-o fat_type=16
 
 WORKDIR?=       work
@@ -330,12 +337,12 @@ ${WORKFSTAB}:
 .if ${USE_GPT} != "no"
 .  if ${SWAPSECTORS} != 0
 	${TOOL_SED}							\
-	    -e "s/ROOT.a/NAME=${BOOTDISK_UUID}/"			\
-	    -e "s/ROOT.b/NAME=${SWAPDISK_UUID}/"			\
+	    -e "s/ROOT.a/NAME=NBImgRoot/"				\
+	    -e "s/ROOT.b/NAME=NBImgSwap/"				\
 	    < ${FSTAB_IN} > ${WORKFSTAB}
 .  else
 	${TOOL_SED}							\
-	    -e "s/ROOT.a/NAME=${BOOTDISK_UUID}/"			\
+	    -e "s/ROOT.a/NAME=NBImgRoot/"				\
 	    -e "/ROOT.b/d"						\
 	    < ${FSTAB_IN} > ${WORKFSTAB}
 .  endif
@@ -448,7 +455,9 @@ ${TARGETFS}: prepare_md_post ${WORKFSTAB}
 	    -B ${TARGET_ENDIANNESS}					\
 	    -xx -F ${WORKSPEC} -N ${WORKDIR}/etc			\
 	    ${MAKEFS_TIMESTAMP}						\
+	    -t ffs							\
 	    ${IMGMAKEFSOPTIONS}						\
+	    -o version=${IMGFFSVERSION}					\
 	    ${WORKFS} ${WORKDIR}
 .if !empty(PRIMARY_BOOT) && ${INSTALLBOOT_AFTER_DISKLABEL} == "no"
 	${TOOL_INSTALLBOOT} -v -m ${MACHINE} ${INSTALLBOOTOPTIONS} ${WORKFS} \
@@ -516,7 +525,6 @@ ${WORKEFI}: ${TARGETFS}
 .endfor
 	${RM} -f ${WORKEFI}
 	${TOOL_MAKEFS} -M ${EFIMB}m -m ${EFIMB}m			\
-	    -B ${TARGET_ENDIANNESS}					\
 	    ${MAKEFS_TIMESTAMP}						\
 	    -t msdos -o F=32,c=1					\
 	    ${WORKEFI} ${EFIWORKDIR}
@@ -548,9 +556,9 @@ ${WORKMBR}:
 	${DD} if=/dev/zero of=${WORKMBR} seek=$$((${IMAGESECTORS} - 1)) count=1
 	${TOOL_GPT} ${GPT_TIMESTAMP} ${WORKMBR} create
 	${TOOL_GPT} ${GPT_TIMESTAMP} ${WORKMBR} add -a 1m -s ${EFISECTORS} -t efi -l "EFI system"
-	${TOOL_GPT} ${GPT_TIMESTAMP} ${WORKMBR} add -a 1m -s ${FSSECTORS} -t ffs
+	${TOOL_GPT} ${GPT_TIMESTAMP} ${WORKMBR} add -a 1m -s ${FSSECTORS} -t ffs -l "NBImgRoot"
 .  if ${SWAPSECTORS} != 0
-	${TOOL_GPT} ${GPT_TIMESTAMP} ${WORKMBR} add -a 1m -s ${SWAPSECTORS} -t swap
+	${TOOL_GPT} ${GPT_TIMESTAMP} ${WORKMBR} add -a 1m -s ${SWAPSECTORS} -t swap -l "NBImgSwap"
 .  endif
 .elif ${USE_MBR} != "no"
 	@echo creating MBR labels...

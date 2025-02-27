@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Privilege Separation for dhcpcd, privileged proxy
- * Copyright (c) 2006-2023 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -251,15 +251,14 @@ ps_root_doioctl(unsigned long req, void *data, size_t len)
 	case SIOCGIFPRIORITY:	/* FALLTHROUGH */
 #endif
 	case SIOCSIFFLAGS:	/* FALLTHROUGH */
-	case SIOCGIFMTU:	/* FALLTHROUGH */
-	case SIOCSIFMTU:
+	case SIOCGIFMTU:
 		break;
 	default:
 		errno = EPERM;
 		return -1;
 	}
 
-	s = socket(PF_INET, SOCK_DGRAM, 0);
+	s = xsocket(PF_INET, SOCK_DGRAM, 0);
 	if (s != -1)
 #ifdef IOCTL_REQUEST_TYPE
 	{
@@ -611,11 +610,6 @@ ps_root_recvmsgcb(void *arg, struct ps_msghdr *psm, struct msghdr *msg)
 		free_rdata = true;
 		break;
 #endif
-#if defined(INET6) && (defined(__linux__) || defined(HAVE_PLEDGE))
-	case PS_IP6FORWARDING:
-		 err = ip6_forwarding(data);
-		 break;
-#endif
 #ifdef PLUGIN_DEV
 	case PS_DEV_INITTED:
 		err = dev_initialised(ctx, data);
@@ -685,17 +679,6 @@ ps_root_startcb(struct ps_process *psp)
 
 	if (if_opensockets(ctx) == -1)
 		logerr("%s: if_opensockets", __func__);
-#ifdef BSD
-	else {
-		/* We only want to write to this socket, so set
-		 * a small as possible buffer size. */
-		socklen_t smallbuf = 1;
-
-		if (setsockopt(ctx->link_fd, SOL_SOCKET, SO_RCVBUF,
-		    &smallbuf, (socklen_t)sizeof(smallbuf)) == -1)
-			logerr("%s: setsockopt(SO_RCVBUF)", __func__);
-	}
-#endif
 
 	/* Open network sockets for sending.
 	 * This is a small bit wasteful for non sandboxed OS's
@@ -899,7 +882,7 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 		return -1;
 #endif
 
-	if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, datafd) == -1)
+	if (xsocketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CXNB, 0, datafd) == -1)
 		return -1;
 	if (ps_setbuf_fdpair(datafd) == -1)
 		return -1;
@@ -935,6 +918,32 @@ ps_root_start(struct dhcpcd_ctx *ctx)
 		return 1;
 
 	return pid;
+}
+
+void
+ps_root_close(struct dhcpcd_ctx *ctx)
+{
+
+	if_closesockets(ctx);
+
+#ifdef INET
+	if (ctx->udp_wfd != -1) {
+		close(ctx->udp_wfd);
+		ctx->udp_wfd = -1;
+	}
+#endif
+#ifdef INET6
+	if (ctx->nd_fd != -1) {
+		close(ctx->nd_fd);
+		ctx->nd_fd = -1;
+	}
+#endif
+#ifdef DHCP6
+	if (ctx->dhcp6_wfd != -1) {
+		close(ctx->dhcp6_wfd);
+		ctx->dhcp6_wfd = -1;
+	}
+#endif
 }
 
 int
@@ -1155,18 +1164,6 @@ err:
 	*ifahead = NULL;
 	errno = EINVAL;
 	return -1;
-}
-#endif
-
-#if defined(__linux__) || defined(HAVE_PLEDGE)
-ssize_t
-ps_root_ip6forwarding(struct dhcpcd_ctx *ctx, const char *ifname)
-{
-
-	if (ps_sendcmd(ctx, PS_ROOT_FD(ctx), PS_IP6FORWARDING, 0,
-	    ifname, ifname != NULL ? strlen(ifname) + 1 : 0) == -1)
-		return -1;
-	return ps_root_readerror(ctx, NULL, 0);
 }
 #endif
 

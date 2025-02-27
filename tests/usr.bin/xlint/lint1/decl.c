@@ -1,4 +1,4 @@
-/*	$NetBSD: decl.c,v 1.30 2024/05/01 17:42:57 rillig Exp $	*/
+/*	$NetBSD: decl.c,v 1.33 2024/11/30 11:27:20 rillig Exp $	*/
 # 3 "decl.c"
 
 /*
@@ -269,3 +269,54 @@ offsetof_on_array_member(void)
 	/* expect+1: error: negative array dimension (-20) [20] */
 	typedef int off_arr_3[-(int)(unsigned long)&((s1 *)0)->arr[3]];
 }
+
+/* PR bin/39639: writing "long double" gave "long int" */
+int
+long_double_vs_long_int(long double *a, long int *b)
+{
+	/* expect+1: warning: illegal combination of 'pointer to long double' and 'pointer to long', op '==' [124] */
+	return a == b;
+}
+
+struct zero_sized_array {
+	int member[0];
+};
+
+void
+type_name_as_member_name(void)
+{
+	typedef char h[10];
+
+	typedef struct {
+		int i;
+		char *c;
+	} fh;
+
+	struct foo {
+		fh h;
+		struct {
+			int x;
+			int y;
+		} fl;
+	};
+}
+
+
+// When query 16 is not enabled, don't produce a 'previous declaration' message
+// without a preceding main diagnostic.
+static void static_function(void) __attribute__((__used__));
+
+// The definition is without 'static'.
+void
+static_function(void)
+{
+}
+
+
+typedef void (*fprint_function)(int, const char *, ...);
+typedef fprint_function (*change_logger)
+    (fprint_function, fprint_function, fprint_function, fprint_function);
+
+// Provoke a long type name to test reallocation in type_name.
+/* expect+1: error: redeclaration of 'static_function' with type 'function(pointer to function(pointer to function(int, pointer to const char, ...) returning void, pointer to function(int, pointer to const char, ...) returning void, pointer to function(int, pointer to const char, ...) returning void, pointer to function(int, pointer to const char, ...) returning void) returning pointer to function(int, pointer to const char, ...) returning void) returning void', expected 'function(void) returning void' [347] */
+void static_function(change_logger);

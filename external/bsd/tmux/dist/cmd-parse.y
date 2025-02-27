@@ -1086,7 +1086,8 @@ cmd_parse_from_arguments(struct args_value *values, u_int count,
 				arg->type = CMD_PARSE_STRING;
 				arg->string = copy;
 				TAILQ_INSERT_TAIL(&cmd->arguments, arg, entry);
-			}
+			} else
+				free(copy);
 		} else if (values[i].type == ARGS_COMMANDS) {
 			arg = xcalloc(1, sizeof *arg);
 			arg->type = CMD_PARSE_PARSED_COMMANDS;
@@ -1272,6 +1273,16 @@ yylex(void)
 			continue;
 		}
 
+		if (ch == '\r') {
+			/*
+			 * Treat \r\n as \n.
+			 */
+			ch = yylex_getc();
+			if (ch != '\n') {
+				yylex_ungetc(ch);
+				ch = '\r';
+			}
+		}
 		if (ch == '\n') {
 			/*
 			 * End of line. Update the line number.
@@ -1614,13 +1625,31 @@ yylex_token(int ch)
 
 	for (;;) {
 		/* EOF or \n are always the end of the token. */
-		if (ch == EOF || (state == NONE && ch == '\n'))
+		if (ch == EOF) {
+			log_debug("%s: end at EOF", __func__);
 			break;
+		}
+		if (state == NONE && ch == '\r') {
+			ch = yylex_getc();
+			if (ch != '\n') {
+				yylex_ungetc(ch);
+				ch = '\r';
+			}
+		}
+		if (state == NONE && ch == '\n') {
+			log_debug("%s: end at EOL", __func__);
+			break;
+		}
 
 		/* Whitespace or ; or } ends a token unless inside quotes. */
-		if ((ch == ' ' || ch == '\t' || ch == ';' || ch == '}') &&
-		    state == NONE)
+		if (state == NONE && (ch == ' ' || ch == '\t')) {
+			log_debug("%s: end at WS", __func__);
 			break;
+		}
+		if (state == NONE && (ch == ';' || ch == '}')) {
+			log_debug("%s: end at %c", __func__, ch);
+			break;
+		}
 
 		/*
 		 * Spaces and comments inside quotes after \n are removed but

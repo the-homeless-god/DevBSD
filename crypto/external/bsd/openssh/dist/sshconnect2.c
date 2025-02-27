@@ -1,5 +1,5 @@
-/*	$NetBSD: sshconnect2.c,v 1.46 2023/12/20 17:15:21 christos Exp $	*/
-/* $OpenBSD: sshconnect2.c,v 1.371 2023/12/18 14:45:49 djm Exp $ */
+/*	$NetBSD: sshconnect2.c,v 1.50 2025/02/18 17:53:24 christos Exp $	*/
+/* $OpenBSD: sshconnect2.c,v 1.375 2024/09/09 02:39:57 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
@@ -27,7 +27,7 @@
  */
 
 #include "includes.h"
-__RCSID("$NetBSD: sshconnect2.c,v 1.46 2023/12/20 17:15:21 christos Exp $");
+__RCSID("$NetBSD: sshconnect2.c,v 1.50 2025/02/18 17:53:24 christos Exp $");
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -89,8 +89,6 @@ static int userauth_kerberos(struct ssh *);
 #endif
 
 /* import */
-extern char *client_version_string;
-extern char *server_version_string;
 extern Options options;
 
 /* tty_flag is set in ssh.c. use this in ssh_userauth2 */
@@ -115,7 +113,7 @@ verify_host_key_callback(struct sshkey *hostkey, struct ssh *ssh)
 	    options.required_rsa_size)) != 0)
 		fatal_r(r, "Bad server host key");
 	if (verify_host_key(xxx_host, xxx_hostaddr, hostkey,
-	    xxx_conn_info) == -1)
+	    xxx_conn_info) != 0)
 		fatal("Host key verification failed.");
 	return 0;
 }
@@ -235,7 +233,7 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
     const struct ssh_conn_info *cinfo)
 {
 	char *myproposal[PROPOSAL_MAX];
-	char *s, *all_key, *hkalgs = NULL;
+	char *all_key, *hkalgs = NULL;
 	int r, use_known_hosts_order = 0;
 
 	xxx_host = host;
@@ -263,14 +261,12 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 		fatal_fr(r, "kex_assemble_namelist");
 	free(all_key);
 
-	if ((s = kex_names_cat(options.kex_algorithms, "ext-info-c")) == NULL)
-		fatal_f("kex_names_cat");
-
 	if (use_known_hosts_order)
 		hkalgs = order_hostkeyalgs(host, hostaddr, port, cinfo);
 
-	kex_proposal_populate_entries(ssh, myproposal, s, options.ciphers,
-	    options.macs, compression_alg_list(options.compression),
+	kex_proposal_populate_entries(ssh, myproposal,
+	    options.kex_algorithms, options.ciphers, options.macs,
+	    compression_alg_list(options.compression),
 	    hkalgs ? hkalgs : options.hostkeyalgorithms);
 
 	free(hkalgs);
@@ -290,16 +286,11 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 #endif
 	ssh->kex->kex[KEX_C25519_SHA256] = kex_gen_client;
 	ssh->kex->kex[KEX_KEM_SNTRUP761X25519_SHA512] = kex_gen_client;
+	ssh->kex->kex[KEX_KEM_MLKEM768X25519_SHA256] = kex_gen_client;
 	ssh->kex->verify_host_key=&verify_host_key_callback;
 
 	ssh_dispatch_run_fatal(ssh, DISPATCH_BLOCK, &ssh->kex->done);
-
-	/* remove ext-info from the KEX proposals for rekeying */
-	free(myproposal[PROPOSAL_KEX_ALGS]);
-	myproposal[PROPOSAL_KEX_ALGS] =
-	    compat_kex_proposal(ssh, options.kex_algorithms);
-	if ((r = kex_prop2buf(ssh->kex->my, myproposal)) != 0)
-		fatal_r(r, "kex_prop2buf");
+	kex_proposal_free_entries(myproposal);
 
 #ifdef DEBUG_KEXDH
 	/* send 1st encrypted/maced/compressed message */
@@ -309,7 +300,6 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 	    (r = ssh_packet_write_wait(ssh)) < 0)
 		fatal_fr(r, "send packet");
 #endif
-	kex_proposal_free_entries(myproposal);
 }
 
 /*
@@ -742,6 +732,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 
 	if ((pktype = sshkey_type_from_name(pkalg)) == KEY_UNSPEC) {
 		debug_f("server sent unknown pkalg %s", pkalg);
+		r = SSH_ERR_INVALID_FORMAT;
 		goto done;
 	}
 	if ((r = sshkey_from_blob(pkblob, blen, &key)) != 0) {
@@ -752,6 +743,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 		error("input_userauth_pk_ok: type mismatch "
 		    "for decoded key (received %d, expected %d)",
 		    key->type, pktype);
+		r = SSH_ERR_INVALID_FORMAT;
 		goto done;
 	}
 
@@ -771,6 +763,7 @@ input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 		    SSH_FP_DEFAULT);
 		error_f("server replied with unknown key: %s %s",
 		    sshkey_type(key), fp == NULL ? "<ERROR>" : fp);
+		r = SSH_ERR_INVALID_FORMAT;
 		goto done;
 	}
 	ident = format_identity(id);

@@ -1,4 +1,4 @@
-/*	$NetBSD: acpi_mcfg.c,v 1.28 2024/05/20 19:15:49 riastradh Exp $	*/
+/*	$NetBSD: acpi_mcfg.c,v 1.30 2024/11/10 10:45:37 mlelstv Exp $	*/
 
 /*-
  * Copyright (C) 2015 NONAKA Kimihiro <nonaka@NetBSD.org>
@@ -28,7 +28,7 @@
 #include "opt_pci.h"
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: acpi_mcfg.c,v 1.28 2024/05/20 19:15:49 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: acpi_mcfg.c,v 1.30 2024/11/10 10:45:37 mlelstv Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -524,10 +524,6 @@ acpimcfg_device_probe(const struct pci_attach_args *pa)
 	return 0;
 }
 
-#ifdef PCI_MACHDEP_ENUMERATE_BUS
-#define pci_enumerate_bus PCI_MACHDEP_ENUMERATE_BUS
-#endif
-
 static void
 acpimcfg_scan_bus(struct pci_softc *sc, pci_chipset_tag_t pc, int bus)
 {
@@ -682,7 +678,6 @@ acpimcfg_map_bus(device_t self, pci_chipset_tag_t pc, int bus)
 
 	error = 0;
 out:
-	aprint_debug_dev(acpi_sc->sc_dev, "%s done", __func__);
 
 	return error;
 }
@@ -759,8 +754,10 @@ acpimcfg_configure_bus_cb(ACPI_RESOURCE *res, void *ctx)
 		return AE_OK;
 	}
 
-	pciinfo->ranges[type].start = addr;
-	pciinfo->ranges[type].end = addr + size - 1;
+	if (size > 0) {
+		pciinfo->ranges[type].start = addr;
+		pciinfo->ranges[type].end = addr + size - 1;
+	}
 
 	return AE_OK;
 }
@@ -780,6 +777,8 @@ acpimcfg_configure_bus(device_t self, pci_chipset_tag_t pc, ACPI_HANDLE handle,
 
 	if (mapcfgspace) {
 		seg = acpimcfg_get_segment(pc, bus);
+		aprint_debug_dev(acpi_sc->sc_dev, "MCFG: Bus=%d, Seg=%p\n",
+		    bus, seg);
 		if (seg == NULL) {
 			return ENOENT;
 		}
@@ -830,6 +829,8 @@ acpimcfg_configure_bus(device_t self, pci_chipset_tag_t pc, ACPI_HANDLE handle,
 	rv = AcpiWalkResources(handle, "_CRS", acpimcfg_configure_bus_cb,
 	    &pciinfo);
 	if (ACPI_FAILURE(rv)) {
+		aprint_debug_dev(acpi_sc->sc_dev, "MCFG: Walk _CRS: %ld\n",
+		    (long)rv);
 		error = ENXIO;
 		goto cleanup;
 	}

@@ -1,4 +1,4 @@
-#	$NetBSD: bsd.own.mk,v 1.1373 2024/04/28 08:01:04 nia Exp $
+#	$NetBSD: bsd.own.mk,v 1.1412 2025/02/24 17:49:38 martin Exp $
 
 # This needs to be before bsd.init.mk
 .if defined(BSD_MK_COMPAT_FILE)
@@ -75,6 +75,23 @@ TOOLCHAIN_MISSING?=	no
 #
 # What GCC is used?
 #
+.if \
+    ${MACHINE_CPU} == "aarch64" || \
+    ${MACHINE_CPU} == "arm" || \
+    ${MACHINE_CPU} == "m68k" || \
+    ${MACHINE_CPU} == "mips" || \
+    ${MACHINE_CPU} == "powerpc" || \
+    ${MACHINE_CPU} == "riscv" || \
+    ${MACHINE_CPU} == "sh3" || \
+    ${MACHINE_ARCH} == "x86_64" || \
+    ${MACHINE_ARCH} == "i386" || \
+    ${MACHINE} == "hppa" || \
+    ${MACHINE} == "sparc" || \
+    ${MACHINE} == "sparc64" || \
+    ${MACHINE} == "ia64" || \
+    ${MACHINE} == "alpha"
+HAVE_GCC?=	12
+.endif
 HAVE_GCC?=	10
 
 #
@@ -100,13 +117,21 @@ MKGCCCMDS?=	no
 .endif	# MKGCC == no							# }
 
 #
+# Build GCC with the "isl" library enabled.
+# The alpha port does not work with it, see GCC PR's 84204 and 84353.
+#
+.if ${MACHINE} == "alpha"
+NOGCCISL=	# defined
+.endif
+
+#
 # What binutils is used?
 #
-HAVE_BINUTILS?=	239
+HAVE_BINUTILS?= 242
 
-.if ${HAVE_BINUTILS} == 239
+.if ${HAVE_BINUTILS} == 242
 EXTERNAL_BINUTILS_SUBDIR=	binutils
-.elif ${HAVE_BINUTILS} == 234
+.elif ${HAVE_BINUTILS} == 239
 EXTERNAL_BINUTILS_SUBDIR=	binutils.old
 .else
 EXTERNAL_BINUTILS_SUBDIR=	/does/not/exist
@@ -115,15 +140,20 @@ EXTERNAL_BINUTILS_SUBDIR=	/does/not/exist
 #
 # What GDB is used?
 #
-HAVE_GDB?=	1320
+HAVE_GDB?=	1510
 
-.if ${HAVE_GDB} == 1320
+.if ${HAVE_GDB} == 1510
 EXTERNAL_GDB_SUBDIR=		gdb
-.elif ${HAVE_GDB} == 1100
+.elif ${HAVE_GDB} == 1320
 EXTERNAL_GDB_SUBDIR=		gdb.old
 .else
 EXTERNAL_GDB_SUBDIR=		/does/not/exist
 .endif
+
+.if ${MACHINE_ARCH} == "x86_64"
+MKGDBSERVER?=	yes
+.endif
+MKGDBSERVER?=	no
 
 #
 # What OpenSSL is used?
@@ -162,6 +192,15 @@ HAVE_ACPI=	no
 HAVE_UEFI=	yes
 .else
 HAVE_UEFI=	no
+.endif
+
+#
+# Does the platform support EFI RT services?
+#
+.if ${HAVE_UEFI} == "yes" && ${MACHINE_ARCH:M*eb} == ""
+HAVE_EFI_RT=	yes
+.else
+HAVE_EFI_RT=	no
 .endif
 
 #
@@ -222,7 +261,15 @@ USE_SSP?=	yes
 .if ${MACHINE_ARCH} == "vax" || ${MACHINE} == "sun2"
 HAVE_JEMALLOC?=		100
 .else
-HAVE_JEMALLOC?=		510
+HAVE_JEMALLOC?=		530
+.endif
+
+.if ${HAVE_JEMALLOC} == 530 || ${HAVE_JEMALLOC} == 100
+EXTERNAL_JEMALLOC_SUBDIR = jemalloc
+.elif ${HAVE_JEMALLOC} == 510
+EXTERNAL_JEMALLOC_SUBDIR = jemalloc.old
+.else
+EXTERNAL_JEMALLOC_SUBDIR = /does/not/exist
 .endif
 
 .if empty(.MAKEFLAGS:tW:M*-V .OBJDIR*)
@@ -233,6 +280,14 @@ PRINTOBJDIR=	${MAKE} -V .OBJDIR
 .endif
 .else
 PRINTOBJDIR=	echo /error/bsd.own.mk/PRINTOBJDIR # avoid infinite recursion
+.endif
+
+#
+# Make sure we set _NETBSD_REVISIONID in CPPFLAGS if requested.
+#
+.ifdef NETBSD_REVISIONID
+_NETBSD_REVISIONID_STR=	"${NETBSD_REVISIONID}"
+CPPFLAGS+=	-D_NETBSD_REVISIONID=${_NETBSD_REVISIONID_STR:Q}
 .endif
 
 #
@@ -441,6 +496,7 @@ TOOL_DTC=		${TOOLDIR}/bin/${_TOOL_PREFIX}dtc
 TOOL_EQN=		${TOOLDIR}/bin/${_TOOL_PREFIX}eqn
 TOOL_FDISK=		${TOOLDIR}/bin/${MACHINE_GNU_PLATFORM}-fdisk
 TOOL_FGEN=		${TOOLDIR}/bin/${_TOOL_PREFIX}fgen
+TOOL_FILE=		${TOOLDIR}/bin/${_TOOL_PREFIX}file
 TOOL_GENASSYM=		${TOOLDIR}/bin/${_TOOL_PREFIX}genassym
 TOOL_GENCAT=		${TOOLDIR}/bin/${_TOOL_PREFIX}gencat
 TOOL_GMAKE=		${TOOLDIR}/bin/${_TOOL_PREFIX}gmake
@@ -465,6 +521,8 @@ TOOL_JOIN=		${TOOLDIR}/bin/${_TOOL_PREFIX}join
 TOOL_LLVM_TBLGEN=	${TOOLDIR}/bin/${_TOOL_PREFIX}llvm-tblgen
 TOOL_M4=		${TOOLDIR}/bin/${_TOOL_PREFIX}m4
 TOOL_MACPPCFIXCOFF=	${TOOLDIR}/bin/${_TOOL_PREFIX}macppc-fixcoff
+TOOL_MACPPCINSTALLBOOT=	${TOOLDIR}/bin/${_TOOL_PREFIX}macppc_installboot
+TOOL_MACPPCMKBOOTHFS=	${TOOLDIR}/bin/${_TOOL_PREFIX}macppc_mkboothfs
 TOOL_MAKEFS=		${TOOLDIR}/bin/${_TOOL_PREFIX}makefs
 TOOL_MAKEINFO=		${TOOLDIR}/bin/${_TOOL_PREFIX}makeinfo
 TOOL_MAKEKEYS=		${TOOLDIR}/bin/${_TOOL_PREFIX}makekeys
@@ -480,6 +538,7 @@ TOOL_M68KELF2AOUT=	${TOOLDIR}/bin/${_TOOL_PREFIX}m68k-elf2aout
 TOOL_MIPSELF2ECOFF=	${TOOLDIR}/bin/${_TOOL_PREFIX}mips-elf2ecoff
 TOOL_MKCSMAPPER=	${TOOLDIR}/bin/${_TOOL_PREFIX}mkcsmapper
 TOOL_MKESDB=		${TOOLDIR}/bin/${_TOOL_PREFIX}mkesdb
+TOOL_MKHYBRID=		${TOOLDIR}/bin/${_TOOL_PREFIX}mkhybrid
 TOOL_MKLOCALE=		${TOOLDIR}/bin/${_TOOL_PREFIX}mklocale
 TOOL_MKMAGIC=		${TOOLDIR}/bin/${_TOOL_PREFIX}file
 TOOL_MKNOD=		${TOOLDIR}/bin/${_TOOL_PREFIX}mknod
@@ -518,6 +577,7 @@ TOOL_SUNLABEL=		${TOOLDIR}/bin/${_TOOL_PREFIX}sunlabel
 TOOL_TBL=		${TOOLDIR}/bin/${_TOOL_PREFIX}tbl
 TOOL_TIC=		${TOOLDIR}/bin/${_TOOL_PREFIX}tic
 TOOL_UUDECODE=		${TOOLDIR}/bin/${_TOOL_PREFIX}uudecode
+TOOL_VAXMOPCOPY=	${TOOLDIR}/bin/${_TOOL_PREFIX}vax-mopcopy
 TOOL_VGRIND=		${TOOLDIR}/bin/${_TOOL_PREFIX}vgrind -f
 TOOL_VFONTEDPR=		${TOOLDIR}/libexec/${_TOOL_PREFIX}vfontedpr
 TOOL_ZIC=		${TOOLDIR}/bin/${_TOOL_PREFIX}zic
@@ -565,6 +625,7 @@ TOOL_DTC=		dtc
 TOOL_EQN=		eqn
 TOOL_FDISK=		fdisk
 TOOL_FGEN=		fgen
+TOOL_FILE=		file
 TOOL_GENASSYM=		genassym
 TOOL_GENCAT=		gencat
 TOOL_GMAKE=		gmake
@@ -634,6 +695,7 @@ TOOL_SUNLABEL=		sunlabel
 TOOL_TBL=		tbl
 TOOL_TIC=		tic
 TOOL_UUDECODE=		uudecode
+TOOL_VAXMOPCOPY=	vax-mopcopy
 TOOL_VGRIND=		vgrind -f
 TOOL_VFONTEDPR=		/usr/libexec/vfontedpr
 TOOL_ZIC=		zic
@@ -879,10 +941,10 @@ MKGCC:= no
 
 MKGDB.or1k=	no
 
-# No kernel modules for or1k or riscv (yet)
+# No kernel modules for or1k (yet)
 MKKMOD.or1k=	no
 
-# No profiling for or1k (yet)
+# No profiling for or1k or risc-v (yet)
 MKPROFILE.or1k=	no
 MKPROFILE.riscv32=no
 MKPROFILE.riscv64=no
@@ -1320,10 +1382,9 @@ MKDTB.riscv32=			yes
 MKDTB.riscv64=			yes
 
 # During transition from xorg-server 1.10 to 1.20
-.if \
-    ${MACHINE} == "alpha"	|| \
-    ${MACHINE} == "netwinder"	|| \
-    ${MACHINE} == "sgimips"
+# XXX sgimips uses XAA which is removed in 1.20, and EXA is hard
+# XXX to do the same with.
+.if ${MACHINE} == "sgimips"
 HAVE_XORG_SERVER_VER?=110
 .else
 HAVE_XORG_SERVER_VER?=120
@@ -1332,7 +1393,7 @@ HAVE_XORG_SERVER_VER?=120
 # Newer Mesa does not build with old X server
 # VAX build triggers a gcc internal error
 .if ${HAVE_XORG_SERVER_VER} != "120" || ${MACHINE} == "vax"
-HAVE_MESA_VER=19
+HAVE_MESA_VER?=19
 .endif
 
 HAVE_MESA_VER?=	21
@@ -1568,7 +1629,7 @@ OBJECT_FMTS=
 OBJECT_FMTS+=	elf32
 .endif
 .if	${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH:M*64*} != ""
-. if !(${MKCOMPAT:Uyes} == "no" && ${MACHINE_CPU} == "mips")
+. if !(${MKCOMPAT:Uyes} == "no" && ${MACHINE_ARCH:Mmips64*} != "")
 OBJECT_FMTS+=	elf64
 . endif
 .endif
@@ -1726,7 +1787,10 @@ HAVE_XORG_GLAMOR?=	no
 	font-bitstream-100dpi font-bitstream-75dpi font-bitstream-type1 \
 	font-cursor-misc font-daewoo-misc font-dec-misc font-ibm-type1 \
 	font-isas-misc font-jis-misc font-misc-misc font-mutt-misc \
-	font-sony-misc font-util ttf-bitstream-vera encodings
+	font-sony-misc font-util ttf-bitstream-vera encodings \
+	font-arabic-misc font-micro-misc font-schumacher-misc \
+	font-sun-misc font-cronyx-cyrillic font-misc-cyrillic \
+	font-screen-cyrillic font-winitzki-cyrillic font-xfree86-type1
 X11SRCDIR.${_dir}?=		${X11SRCDIRMIT}/${_dir}/dist
 .endfor
 
@@ -1749,8 +1813,8 @@ EXTRA_DRIVERS=	modesetting
 .for _v in \
 	ag10e amdgpu apm ark ast ati ati-kms chips cirrus crime \
 	geode glint i128 i740 igs imstt intel intel-old intel-2014 \
-	${EXTRA_DRIVERS} mach64 mga \
-	neomagic newport nouveau nsc nv openchrome pnozz \
+	${EXTRA_DRIVERS} mach64 mga mgx \
+	neomagic newport ngle nouveau nsc nv openchrome pnozz \
 	r128 rendition \
 	s3 s3virge savage siliconmotion sis suncg14 \
 	suncg6 sunffb sunleo suntcx \

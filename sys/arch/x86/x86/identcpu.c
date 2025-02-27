@@ -1,4 +1,4 @@
-/*	$NetBSD: identcpu.c,v 1.128 2023/10/17 14:17:42 riastradh Exp $	*/
+/*	$NetBSD: identcpu.c,v 1.133 2025/01/17 10:38:48 riastradh Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001, 2006, 2007, 2008 The NetBSD Foundation, Inc.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: identcpu.c,v 1.128 2023/10/17 14:17:42 riastradh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: identcpu.c,v 1.133 2025/01/17 10:38:48 riastradh Exp $");
 
 #include "opt_xen.h"
 
@@ -144,13 +144,27 @@ cpu_probe_intel_cache(struct cpu_info *ci)
 static void
 cpu_probe_intel_errata(struct cpu_info *ci)
 {
-	u_int family, model, stepping;
+	u_int family, model;
 
 	family = CPUID_TO_FAMILY(ci->ci_signature);
 	model = CPUID_TO_MODEL(ci->ci_signature);
-	stepping = CPUID_TO_STEPPING(ci->ci_signature);
 
-	if (family == 0x6 && model == 0x5C && stepping == 0x9) { /* Apollo Lake */
+	/*
+	 * For details, refer to the Intel Pentium and Celeron Processor
+	 * N- and J- Series Specification Update (Document number: 334820-010),
+	 * August 2022, Revision 010. See page 28, Section 5.30: "APL30 A Store
+	 * Instruction May Not Wake Up MWAIT."
+	 * https://cdrdv2-public.intel.com/334820/334820-APL_Spec_Update_rev010.pdf
+	 * https://web.archive.org/web/20250114072355/https://cdrdv2-public.intel.com/334820/334820-APL_Spec_Update_rev010.pdf
+	 *
+	 * Disable MWAIT/MONITOR on Apollo Lake CPUs to address the
+	 * APL30 erratum.  When using the MONITOR/MWAIT instruction
+	 * pair, stores to the armed address range may fail to trigger
+	 * MWAIT to resume execution.  When these instructions are used
+	 * to hatch secondary CPUs, this erratum causes SMP boot
+	 * failures.
+	 */
+	if (family == 0x6 && model == 0x5C) {
 		wrmsr(MSR_MISC_ENABLE,
 		    rdmsr(MSR_MISC_ENABLE) & ~IA32_MISC_MWAIT_EN);
 
@@ -481,10 +495,6 @@ cpu_probe_c3(struct cpu_info *ci)
 	model = CPUID_TO_MODEL(ci->ci_signature);
 	stepping = CPUID_TO_STEPPING(ci->ci_signature);
 
-	/* Determine the largest extended function value. */
-	x86_cpuid(0x80000000, descs);
-	lfunc = descs[0];
-
 	if (family == 6) {
 		/*
 		 * VIA Eden ESP.
@@ -499,11 +509,45 @@ cpu_probe_c3(struct cpu_info *ci)
 		 *    bit in the FCR MSR.
 		 */
 		ci->ci_feat_val[0] |= CPUID_CX8;
-		wrmsr(MSR_VIA_FCR, rdmsr(MSR_VIA_FCR) | VIA_ACE_ECX8);
+		wrmsr(MSR_VIA_FCR, rdmsr(MSR_VIA_FCR) | VIA_FCR_CX8_REPORT);
+
+		/*
+		 * For reference on VIA Alternate Instructions, see the VIA C3
+		 * Processor Alternate Instruction Set Application Note, 2002.
+		 * http://www.bitsavers.org/components/viaTechnologies/C3-ais-appnote.pdf
+		 *
+		 * Disable unsafe ALTINST mode for VIA C3 processors, if necessary.
+		 *
+		 * This is done for the security reasons, as some CPUs were
+		 * found with ALTINST enabled by default.  This functionality
+		 * has ability to bypass many x86 architecture memory
+		 * protections and privilege checks, exposing a possibility
+		 * for backdoors and should not be enabled unintentionally.
+		 */
+		if (model > 0x5 && model < 0xA) {
+			int disable_ais = 0;
+			x86_cpuid(0xc0000000, descs);
+			lfunc = descs[0];
+			/* Check AIS flags first if supported ("Nehemiah"). */
+			if (lfunc >= 0xc0000001) {
+				x86_cpuid(0xc0000001, descs);
+				lfunc = descs[3];
+				if ((lfunc & CPUID_VIA_HAS_AIS)
+				    && (lfunc & CPUID_VIA_DO_AIS)) {
+					disable_ais = 1;
+				}
+			} else	/* Explicitly disable AIS for pre-CX5L CPUs. */
+				disable_ais = 1;
+
+			if (disable_ais) {
+				msr = rdmsr(MSR_VIA_FCR);
+				wrmsr(MSR_VIA_FCR, msr & ~VIA_FCR_ALTINST_ENABLE);
+			}
+		}
 	}
 
 	if (family > 6 || model > 0x9 || (model == 0x9 && stepping >= 3)) {
-		/* VIA Nehemiah or Esther. */
+		/* VIA Nehemiah or later. */
 		x86_cpuid(0xc0000000, descs);
 		lfunc = descs[0];
 		if (lfunc >= 0xc0000001) {	/* has ACE, RNG */
@@ -571,17 +615,15 @@ cpu_probe_c3(struct cpu_info *ci)
 		    }
 
 		    if (ace_enable) {
-			msr = rdmsr(MSR_VIA_ACE);
-			wrmsr(MSR_VIA_ACE, msr | VIA_ACE_ENABLE);
+			msr = rdmsr(MSR_VIA_FCR);
+			wrmsr(MSR_VIA_FCR, msr | VIA_FCR_ACE_ENABLE);
 		    }
 		}
 	}
 
-	/* Explicitly disable unsafe ALTINST mode. */
-	if (ci->ci_feat_val[4] & CPUID_VIA_DO_ACE) {
-		msr = rdmsr(MSR_VIA_ACE);
-		wrmsr(MSR_VIA_ACE, msr & ~VIA_ACE_ALTINST);
-	}
+	/* Determine the largest extended function value. */
+	x86_cpuid(0x80000000, descs);
+	lfunc = descs[0];
 
 	/*
 	 * Determine L1 cache/TLB info.
@@ -1044,6 +1086,7 @@ static const struct vm_name_guest vm_bios_vendors[] = {
 	{ "BHYVE", VM_GUEST_VM },			/* bhyve */
 	{ "Seabios", VM_GUEST_VM },			/* KVM */
 	{ "innotek GmbH", VM_GUEST_VIRTUALBOX },	/* Oracle VirtualBox */
+	{ "Generic PVH", VM_GUEST_GENPVH},		/* Generic PVH */
 };
 
 static const struct vm_name_guest vm_system_products[] = {
@@ -1065,6 +1108,7 @@ identify_hypervisor(void)
 	switch (vm_guest) {
 	case VM_GUEST_XENPV:
 	case VM_GUEST_XENPVH:
+	case VM_GUEST_GENPVH:
 		/* guest type already known, no bios info */
 		return;
 	default:

@@ -1,4 +1,4 @@
-# $NetBSD: cond-func-empty.mk,v 1.24 2023/12/19 19:33:40 rillig Exp $
+# $NetBSD: cond-func-empty.mk,v 1.28 2025/01/11 20:54:45 rillig Exp $
 #
 # Tests for the empty() function in .if conditions, which tests an
 # expression for emptiness.
@@ -104,10 +104,10 @@ WORD=	word
 
 # Now the variable named " " gets a non-empty value, which demonstrates that
 # neither leading nor trailing spaces are trimmed in the argument of the
-# function.  If the spaces were trimmed, the variable name would be "" and
-# that variable is indeed undefined.  Since CondParser_FuncCallEmpty calls
-# Var_Parse without VARE_UNDEFERR, the value of the undefined variable ""
-# would be returned as an empty string.
+# function.  If the spaces were trimmed, the variable name would be "", and
+# that variable is indeed undefined.  Since CondParser_FuncCallEmpty allows
+# subexpressions to be based on undefined variables, the value of the
+# undefined variable "" would be returned as an empty string.
 ${:U }=	space
 .if empty( )
 .  error
@@ -163,8 +163,7 @@ ${:U WORD }=	variable name with spaces
 .  error
 .endif
 
-# expect+2: Unclosed variable "WORD"
-# expect+1: Malformed conditional (empty(WORD)
+# expect+1: Unclosed variable "WORD"
 .if empty(WORD
 .  error
 .else
@@ -194,19 +193,23 @@ ${:U WORD }=	variable name with spaces
 # wrong variable name should have been discarded quickly after parsing it, to
 # prevent it from doing any harm.
 #
-# The expression was expanded, and this was wrong.  The
-# expansion was done without VARE_WANTRES (called VARF_WANTRES back then)
-# though.  This had the effect that the ${:U1} from the value of VARNAME
-# expanded to an empty string.  This in turn created the seemingly recursive
-# definition VARNAME=${VARNAME}, and that definition was never meant to be
-# expanded.
+# The expression was evaluated, and this was wrong.  The evaluation was done
+# without VARE_EVAL (called VARF_WANTRES back then) though.  This had the
+# effect that the ${:U1} from the value of VARNAME evaluated to an empty
+# string.  This in turn created the seemingly recursive definition
+# VARNAME=${VARNAME}, and that definition was evaluated even though it was
+# never meant to be evaluated.
 #
-# This was fixed by expanding nested expressions in the variable name
-# only if the flag VARE_WANTRES is given.
+# This was fixed by evaluating nested expressions in the variable name only
+# when the whole expression was evaluated as well.
 VARNAME=	${VARNAME${:U1}}
 .if defined(VARNAME${:U2}) && !empty(VARNAME${:U2})
 .endif
 
+# Expressions in the argument of a function call don't have to be defined.
+.if !empty(${UNDEF})
+.  error
+.endif
 
 # If the word 'empty' is not followed by '(', it is not a function call but an
 # ordinary bare word.  This bare word is interpreted as 'defined(empty)', and

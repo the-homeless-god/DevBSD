@@ -252,6 +252,7 @@ popup_draw_cb(struct client *c, void *data, struct screen_redraw_ctx *rctx)
 		tty_draw_line(tty, &s, 0, i, pd->sx, px, py + i, &defaults,
 		    palette);
 	}
+	screen_free(&s);
 	if (pd->md != NULL) {
 		c->overlay_check = NULL;
 		c->overlay_data = NULL;
@@ -344,7 +345,7 @@ popup_make_pane(struct popup_data *pd, enum layout_type type)
 	u_int			 hlimit;
 	const char		*shell;
 
-	window_unzoom(w);
+	window_unzoom(w, 1);
 
 	lc = layout_split_pane(wp, type, -1, 0);
 	hlimit = options_get_number(s->options, "history-limit");
@@ -541,7 +542,7 @@ popup_key_cb(struct client *c, void *data, struct key_event *event)
 	}
 	if ((((pd->flags & (POPUP_CLOSEEXIT|POPUP_CLOSEEXITZERO)) == 0) ||
 	    pd->job == NULL) &&
-	    (event->key == '\033' || event->key == '\003'))
+	    (event->key == '\033' || event->key == ('c'|KEYC_CTRL)))
 		return (1);
 	if (pd->job != NULL) {
 		if (KEYC_IS_MOUSE(event->key)) {
@@ -573,8 +574,8 @@ menu:
 		x = m->x - (pd->menu->width + 4) / 2;
 	else
 		x = 0;
-	pd->md = menu_prepare(pd->menu, 0, NULL, x, m->y, c, NULL,
-	    popup_menu_done, pd);
+	pd->md = menu_prepare(pd->menu, 0, 0, NULL, x, m->y, c,
+	    BOX_LINES_DEFAULT, NULL, NULL, NULL, NULL, popup_menu_done, pd);
 	c->flags |= CLIENT_REDRAWOVERLAY;
 
 out:
@@ -635,7 +636,7 @@ int
 popup_display(int flags, enum box_lines lines, struct cmdq_item *item, u_int px,
     u_int py, u_int sx, u_int sy, struct environ *env, const char *shellcmd,
     int argc, char **argv, const char *cwd, const char *title, struct client *c,
-    struct session *s, const char* style, const char* border_style,
+    struct session *s, const char *style, const char *border_style,
     popup_close_cb cb, void *arg)
 {
 	struct popup_data	*pd;
@@ -716,7 +717,7 @@ popup_display(int flags, enum box_lines lines, struct cmdq_item *item, u_int px,
 
 	pd->job = job_run(shellcmd, argc, argv, env, s, cwd,
 	    popup_job_update_cb, popup_job_complete_cb, NULL, pd,
-	    JOB_NOWAIT|JOB_PTY|JOB_KEEPWRITE, jx, jy);
+	    JOB_NOWAIT|JOB_PTY|JOB_KEEPWRITE|JOB_DEFAULTSHELL, jx, jy);
 	pd->ictx = input_init(NULL, job_get_event(pd->job), &pd->palette);
 
 	server_client_set_overlay(c, 0, popup_check_cb, popup_mode_cb,
@@ -786,6 +787,8 @@ popup_editor(struct client *c, const char *buf, size_t len,
 	if (fd == -1)
 		return (-1);
 	f = fdopen(fd, "w");
+	if (f == NULL)
+		return (-1);
 	if (fwrite(buf, len, 1, f) != 1) {
 		fclose(f);
 		return (-1);

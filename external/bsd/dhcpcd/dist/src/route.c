@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * dhcpcd - route management
- * Copyright (c) 2006-2023 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -502,6 +502,49 @@ rt_recvrt(int cmd, const struct rt *rt, pid_t pid)
 #endif
 }
 
+/* Compare miscellaneous route details */
+static bool
+rt_cmp_misc(struct rt *nrt, struct rt *ort)
+{
+#if defined(__FreeBSD__) || defined(__DragonFly__)
+	/* FreeBSD puts the interface MTU into the route MTU
+	 * if the route does not define it's own. */
+	unsigned int nmtu, omtu;
+
+	nmtu = nrt->rt_mtu ? nrt->rt_mtu : nrt->rt_ifp->mtu;
+	omtu = ort->rt_mtu ? ort->rt_mtu : ort->rt_ifp->mtu;
+	if (omtu != nmtu)
+		return false;
+#else
+	if (ort->rt_mtu != nrt->rt_mtu)
+		return false;
+#endif
+
+#ifdef HAVE_ROUTE_LIFETIME
+	/* There might be a minor difference between kernel route
+	 * lifetime and our lifetime due to processing times.
+	 * We allow a small deviation to avoid needless route changes.
+	 * dhcpcd will expire the route regardless of route lifetime support.
+	 */
+	struct timespec ts;
+	uint32_t deviation;
+
+	timespecsub(&nrt->rt_aquired, &ort->rt_aquired, &ts);
+	if (ts.tv_sec < 0)
+		ts.tv_sec = -ts.tv_sec;
+	if (ts.tv_sec > RTLIFETIME_DEV_MAX)
+		return false;
+	if (nrt->rt_lifetime > ort->rt_lifetime)
+		deviation = nrt->rt_lifetime - ort->rt_lifetime;
+	else
+		deviation = ort->rt_lifetime - nrt->rt_lifetime;
+	if (deviation > RTLIFETIME_DEV_MAX)
+		return false;
+#endif
+
+	return true;
+}
+
 static bool
 rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 {
@@ -540,7 +583,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 #endif
 		    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)))
 		{
-			if (ort->rt_mtu == nrt->rt_mtu)
+			if (rt_cmp_misc(nrt, ort))
 				return true;
 			change = true;
 			kroute = true;
@@ -555,7 +598,7 @@ rt_add(rb_tree_t *kroutes, struct rt *nrt, struct rt *ort)
 	    rt_cmp_netmask(ort, nrt) == 0 &&
 	    sa_cmp(&ort->rt_gateway, &nrt->rt_gateway) == 0)
 	{
-		if (ort->rt_mtu == nrt->rt_mtu)
+		if (rt_cmp_misc(nrt, ort))
 			return true;
 		change = true;
 	}
@@ -678,7 +721,7 @@ rt_doroute(rb_tree_t *kroutes, struct rt *rt)
 		    !rt_cmp(rt, or) ||
 		    (rt->rt_ifa.sa_family != AF_UNSPEC &&
 		    sa_cmp(&or->rt_ifa, &rt->rt_ifa) != 0) ||
-		    or->rt_mtu != rt->rt_mtu)
+		    !rt_cmp_misc(rt, or))
 		{
 			if (!rt_add(kroutes, rt, or))
 				return false;

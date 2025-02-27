@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.290 2024/05/20 18:14:38 pgoyette Exp $
+#	$NetBSD: Makefile,v 1.295 2025/01/23 19:02:42 brad Exp $
 
 .include <bsd.own.mk>
 
@@ -60,6 +60,8 @@ SUBDIR+=	dbcool
 SUBDIR+=	des
 SUBDIR+=	dk_subr
 SUBDIR+=	drvctl
+SUBDIR+=	ds2482ow
+SUBDIR+=	ds28e17iic
 SUBDIR+=	efs
 SUBDIR+=	ext2fs
 SUBDIR+=	exec_script
@@ -95,6 +97,7 @@ SUBDIR+=	if_lagg
 SUBDIR+=	if_loop
 SUBDIR+=	if_mpls
 SUBDIR+=	if_mue
+SUBDIR+=	if_ncm
 SUBDIR+=	if_npflog
 SUBDIR+=	if_ppp
 SUBDIR+=	if_pppoe
@@ -114,7 +117,9 @@ SUBDIR+=	if_vlan
 SUBDIR+=	if_wg
 SUBDIR+=	iic
 SUBDIR+=	ip_ecn
+.if ${MKIPFILTER:Uno} != no
 SUBDIR+=	ipl
+.endif
 SUBDIR+=	kernfs
 SUBDIR+=	layerfs
 SUBDIR+=	lfs
@@ -296,6 +301,7 @@ SUBDIR+=	acpilid
 SUBDIR+=	acpipmtr
 SUBDIR+=	acpitz
 SUBDIR+=	acpivga
+SUBDIR+=	acpivmgenid
 SUBDIR+=	acpiwdrt
 SUBDIR+=	acpiwmi
 SUBDIR+=	aibs

@@ -1,4 +1,4 @@
-/*	$NetBSD: named-rrchecker.c,v 1.7 2024/02/21 22:51:41 christos Exp $	*/
+/*	$NetBSD: named-rrchecker.c,v 1.9 2025/01/26 16:25:10 christos Exp $	*/
 
 /*
  * Copyright (C) Internet Systems Consortium, Inc. ("ISC")
@@ -15,13 +15,13 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include <isc/attributes.h>
 #include <isc/buffer.h>
 #include <isc/commandline.h>
 #include <isc/lex.h>
 #include <isc/mem.h>
-#include <isc/print.h>
 #include <isc/result.h>
 #include <isc/string.h>
 #include <isc/util.h>
@@ -51,7 +51,7 @@ usage(void) {
 	fprintf(stderr, "\t-P: list the supported private type names\n");
 	fprintf(stderr, "\t-T: list the supported standard type names\n");
 	fprintf(stderr, "\t-u: print the record in unknown record format\n");
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 static void
@@ -78,7 +78,7 @@ fatal(const char *format, ...) {
 	va_end(args);
 	fputc('\n', stderr);
 	cleanup();
-	exit(1);
+	_exit(EXIT_FAILURE);
 }
 
 int
@@ -127,7 +127,7 @@ main(int argc, char *argv[]) {
 					fprintf(stdout, "%s\n", text);
 				}
 			}
-			exit(0);
+			exit(EXIT_SUCCESS);
 
 		case 'P':
 			for (t = 0xff00; t <= 0xfffeu; t++) {
@@ -163,15 +163,15 @@ main(int argc, char *argv[]) {
 		default:
 			fprintf(stderr, "%s: unhandled option -%c\n", argv[0],
 				isc_commandline_option);
-			exit(1);
+			exit(EXIT_FAILURE);
 		}
 	}
 	if (doexit) {
-		exit(0);
+		exit(EXIT_SUCCESS);
 	}
 
 	isc_mem_create(&mctx);
-	RUNTIME_CHECK(isc_lex_create(mctx, 256, &lex) == ISC_R_SUCCESS);
+	isc_lex_create(mctx, 256, &lex);
 
 	/*
 	 * Set up to lex DNS master file.
@@ -188,7 +188,8 @@ main(int argc, char *argv[]) {
 
 	if (origin != NULL) {
 		name = dns_fixedname_initname(&fixed);
-		result = dns_name_fromstring(name, origin, 0, NULL);
+		result = dns_name_fromstring(name, origin, dns_rootname, 0,
+					     NULL);
 		if (result != ISC_R_SUCCESS) {
 			fatal("dns_name_fromstring: %s",
 			      isc_result_totext(result));
@@ -344,5 +345,5 @@ main(int argc, char *argv[]) {
 	}
 
 	cleanup();
-	return (0);
+	return 0;
 }

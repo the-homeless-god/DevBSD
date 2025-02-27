@@ -263,6 +263,17 @@ status_line_size(struct client *c)
 	return (s->statuslines);
 }
 
+/* Get the prompt line number for client's session. 1 means at the bottom. */
+static u_int
+status_prompt_line_at(struct client *c)
+{
+	struct session	*s = c->session;
+
+	if (c->flags & (CLIENT_STATUSOFF|CLIENT_CONTROL))
+		return (1);
+	return (options_get_number(s->options, "message-line"));
+}
+
 /* Get window at window list position. */
 struct style_range *
 status_get_range(struct client *c, u_int x, u_int y)
@@ -461,17 +472,26 @@ void
 status_message_set(struct client *c, int delay, int ignore_styles,
     int ignore_keys, const char *fmt, ...)
 {
-	struct timeval	tv;
-	va_list		ap;
+	struct timeval	 tv;
+	va_list		 ap;
+	char		*s;
+
+	va_start(ap, fmt);
+	xvasprintf(&s, fmt, ap);
+	va_end(ap);
+
+	log_debug("%s: %s", __func__, s);
+
+	if (c == NULL) {
+		server_add_message("message: %s", s);
+		free(s);
+		return;
+	}
 
 	status_message_clear(c);
 	status_push_screen(c);
-
-	va_start(ap, fmt);
-	xvasprintf(&c->message_string, fmt, ap);
-	va_end(ap);
-
-	server_add_message("%s message: %s", c->name, c->message_string);
+	c->message_string = s;
+	server_add_message("%s message: %s", c->name, s);
 
 	/*
 	 * With delay -1, the display-time option is used; zero means wait for
@@ -533,7 +553,7 @@ status_message_redraw(struct client *c)
 	struct session		*s = c->session;
 	struct screen		 old_screen;
 	size_t			 len;
-	u_int			 lines, offset;
+	u_int			 lines, offset, messageline;
 	struct grid_cell	 gc;
 	struct format_tree	*ft;
 
@@ -546,6 +566,10 @@ status_message_redraw(struct client *c)
 		lines = 1;
 	screen_init(sl->active, c->tty.sx, lines, 0);
 
+	messageline = status_prompt_line_at(c);
+	if (messageline > lines - 1)
+		messageline = lines - 1;
+
 	len = screen_write_strlen("%s", c->message_string);
 	if (len > c->tty.sx)
 		len = c->tty.sx;
@@ -555,11 +579,11 @@ status_message_redraw(struct client *c)
 	format_free(ft);
 
 	screen_write_start(&ctx, sl->active);
-	screen_write_fast_copy(&ctx, &sl->screen, 0, 0, c->tty.sx, lines - 1);
-	screen_write_cursormove(&ctx, 0, lines - 1, 0);
+	screen_write_fast_copy(&ctx, &sl->screen, 0, 0, c->tty.sx, lines);
+	screen_write_cursormove(&ctx, 0, messageline, 0);
 	for (offset = 0; offset < c->tty.sx; offset++)
 		screen_write_putc(&ctx, &gc, ' ');
-	screen_write_cursormove(&ctx, 0, lines - 1, 0);
+	screen_write_cursormove(&ctx, 0, messageline, 0);
 	if (c->message_ignore_styles)
 		screen_write_nputs(&ctx, len, &gc, "%s", c->message_string);
 	else
@@ -582,6 +606,8 @@ status_prompt_set(struct client *c, struct cmd_find_state *fs,
 {
 	struct format_tree	*ft;
 	char			*tmp;
+
+	server_client_clear_overlay(c);
 
 	if (fs != NULL)
 		ft = format_create_from_state(NULL, c, fs);
@@ -695,7 +721,7 @@ status_prompt_redraw(struct client *c)
 	struct session		*s = c->session;
 	struct screen		 old_screen;
 	u_int			 i, lines, offset, left, start, width;
-	u_int			 pcursor, pwidth;
+	u_int			 pcursor, pwidth, promptline;
 	struct grid_cell	 gc, cursorgc;
 	struct format_tree	*ft;
 
@@ -707,6 +733,10 @@ status_prompt_redraw(struct client *c)
 	if (lines <= 1)
 		lines = 1;
 	screen_init(sl->active, c->tty.sx, lines, 0);
+
+	promptline = status_prompt_line_at(c);
+	if (promptline > lines - 1)
+		promptline = lines - 1;
 
 	ft = format_create_defaults(NULL, c, NULL, NULL, NULL);
 	if (c->prompt_mode == PROMPT_COMMAND)
@@ -723,13 +753,13 @@ status_prompt_redraw(struct client *c)
 		start = c->tty.sx;
 
 	screen_write_start(&ctx, sl->active);
-	screen_write_fast_copy(&ctx, &sl->screen, 0, 0, c->tty.sx, lines - 1);
-	screen_write_cursormove(&ctx, 0, lines - 1, 0);
+	screen_write_fast_copy(&ctx, &sl->screen, 0, 0, c->tty.sx, lines);
+	screen_write_cursormove(&ctx, 0, promptline, 0);
 	for (offset = 0; offset < c->tty.sx; offset++)
 		screen_write_putc(&ctx, &gc, ' ');
-	screen_write_cursormove(&ctx, 0, lines - 1, 0);
+	screen_write_cursormove(&ctx, 0, promptline, 0);
 	format_draw(&ctx, &gc, start, c->prompt_string, NULL, 0);
-	screen_write_cursormove(&ctx, start, lines - 1, 0);
+	screen_write_cursormove(&ctx, start, promptline, 0);
 
 	left = c->tty.sx - start;
 	if (left == 0)
@@ -811,19 +841,19 @@ status_prompt_translate_key(struct client *c, key_code key, key_code *new_key)
 {
 	if (c->prompt_mode == PROMPT_ENTRY) {
 		switch (key) {
-		case '\001': /* C-a */
-		case '\003': /* C-c */
-		case '\005': /* C-e */
-		case '\007': /* C-g */
-		case '\010': /* C-h */
+		case 'a'|KEYC_CTRL:
+		case 'c'|KEYC_CTRL:
+		case 'e'|KEYC_CTRL:
+		case 'g'|KEYC_CTRL:
+		case 'h'|KEYC_CTRL:
 		case '\011': /* Tab */
-		case '\013': /* C-k */
-		case '\016': /* C-n */
-		case '\020': /* C-p */
-		case '\024': /* C-t */
-		case '\025': /* C-u */
-		case '\027': /* C-w */
-		case '\031': /* C-y */
+		case 'k'|KEYC_CTRL:
+		case 'n'|KEYC_CTRL:
+		case 'p'|KEYC_CTRL:
+		case 't'|KEYC_CTRL:
+		case 'u'|KEYC_CTRL:
+		case 'w'|KEYC_CTRL:
+		case 'y'|KEYC_CTRL:
 		case '\n':
 		case '\r':
 		case KEYC_LEFT|KEYC_CTRL:
@@ -862,7 +892,7 @@ status_prompt_translate_key(struct client *c, key_code key, key_code *new_key)
 	case 'S':
 		c->prompt_mode = PROMPT_ENTRY;
 		c->flags |= CLIENT_REDRAWSTATUS;
-		*new_key = '\025'; /* C-u */
+		*new_key = 'u'|KEYC_CTRL;
 		return (1);
 	case 'i':
 	case '\033': /* Escape */
@@ -883,7 +913,7 @@ status_prompt_translate_key(struct client *c, key_code key, key_code *new_key)
 		return (1);
 	case 'C':
 	case 'D':
-		*new_key = '\013'; /* C-k */
+		*new_key = 'k'|KEYC_CTRL;
 		return (1);
 	case KEYC_BSPACE:
 	case 'X':
@@ -896,7 +926,7 @@ status_prompt_translate_key(struct client *c, key_code key, key_code *new_key)
 		*new_key = 'B'|KEYC_VI;
 		return (1);
 	case 'd':
-		*new_key = '\025'; /* C-u */
+		*new_key = 'u'|KEYC_CTRL;
 		return (1);
 	case 'e':
 		*new_key = 'e'|KEYC_VI;
@@ -911,10 +941,10 @@ status_prompt_translate_key(struct client *c, key_code key, key_code *new_key)
 		*new_key = 'W'|KEYC_VI;
 		return (1);
 	case 'p':
-		*new_key = '\031'; /* C-y */
+		*new_key = 'y'|KEYC_CTRL;
 		return (1);
 	case 'q':
-		*new_key = '\003'; /* C-c */
+		*new_key = 'c'|KEYC_CTRL;
 		return (1);
 	case 's':
 	case KEYC_DC:
@@ -938,8 +968,8 @@ status_prompt_translate_key(struct client *c, key_code key, key_code *new_key)
 	case 'k':
 		*new_key = KEYC_UP;
 		return (1);
-	case '\010' /* C-h */:
-	case '\003' /* C-c */:
+	case 'h'|KEYC_CTRL:
+	case 'c'|KEYC_CTRL:
 	case '\n':
 	case '\r':
 		return (1);
@@ -966,8 +996,7 @@ status_prompt_paste(struct client *c)
 		if ((pb = paste_get_top(NULL)) == NULL)
 			return (0);
 		bufdata = paste_buffer_data(pb, &bufsize);
-		ud = xreallocarray(NULL, bufsize + 1, sizeof *ud);
-		udp = ud;
+		ud = udp = xreallocarray(NULL, bufsize + 1, sizeof *ud);
 		for (i = 0; i != bufsize; /* nothing */) {
 			more = utf8_open(udp, bufdata[i]);
 			if (more == UTF8_MORE) {
@@ -988,25 +1017,24 @@ status_prompt_paste(struct client *c)
 		udp->size = 0;
 		n = udp - ud;
 	}
-	if (n == 0)
-		return (0);
-
-	c->prompt_buffer = xreallocarray(c->prompt_buffer, size + n + 1,
-	    sizeof *c->prompt_buffer);
-	if (c->prompt_index == size) {
-		memcpy(c->prompt_buffer + c->prompt_index, ud,
-		    n * sizeof *c->prompt_buffer);
-		c->prompt_index += n;
-		c->prompt_buffer[c->prompt_index].size = 0;
-	} else {
-		memmove(c->prompt_buffer + c->prompt_index + n,
-		    c->prompt_buffer + c->prompt_index,
-		    (size + 1 - c->prompt_index) * sizeof *c->prompt_buffer);
-		memcpy(c->prompt_buffer + c->prompt_index, ud,
-		    n * sizeof *c->prompt_buffer);
-		c->prompt_index += n;
+	if (n != 0) {
+		c->prompt_buffer = xreallocarray(c->prompt_buffer, size + n + 1,
+		    sizeof *c->prompt_buffer);
+		if (c->prompt_index == size) {
+			memcpy(c->prompt_buffer + c->prompt_index, ud,
+			    n * sizeof *c->prompt_buffer);
+			c->prompt_index += n;
+			c->prompt_buffer[c->prompt_index].size = 0;
+		} else {
+			memmove(c->prompt_buffer + c->prompt_index + n,
+			    c->prompt_buffer + c->prompt_index,
+			    (size + 1 - c->prompt_index) *
+			    sizeof *c->prompt_buffer);
+			memcpy(c->prompt_buffer + c->prompt_index, ud,
+			    n * sizeof *c->prompt_buffer);
+			c->prompt_index += n;
+		}
 	}
-
 	if (ud != c->prompt_saved)
 		free(ud);
 	return (1);
@@ -1237,28 +1265,28 @@ status_prompt_key(struct client *c, key_code key)
 process_key:
 	switch (key) {
 	case KEYC_LEFT:
-	case '\002': /* C-b */
+	case 'b'|KEYC_CTRL:
 		if (c->prompt_index > 0) {
 			c->prompt_index--;
 			break;
 		}
 		break;
 	case KEYC_RIGHT:
-	case '\006': /* C-f */
+	case 'f'|KEYC_CTRL:
 		if (c->prompt_index < size) {
 			c->prompt_index++;
 			break;
 		}
 		break;
 	case KEYC_HOME:
-	case '\001': /* C-a */
+	case 'a'|KEYC_CTRL:
 		if (c->prompt_index != 0) {
 			c->prompt_index = 0;
 			break;
 		}
 		break;
 	case KEYC_END:
-	case '\005': /* C-e */
+	case 'e'|KEYC_CTRL:
 		if (c->prompt_index != size) {
 			c->prompt_index = size;
 			break;
@@ -1269,7 +1297,7 @@ process_key:
 			goto changed;
 		break;
 	case KEYC_BSPACE:
-	case '\010': /* C-h */
+	case 'h'|KEYC_CTRL:
 		if (c->prompt_index != 0) {
 			if (c->prompt_index == size)
 				c->prompt_buffer[--c->prompt_index].size = 0;
@@ -1284,7 +1312,7 @@ process_key:
 		}
 		break;
 	case KEYC_DC:
-	case '\004': /* C-d */
+	case 'd'|KEYC_CTRL:
 		if (c->prompt_index != size) {
 			memmove(c->prompt_buffer + c->prompt_index,
 			    c->prompt_buffer + c->prompt_index + 1,
@@ -1293,17 +1321,17 @@ process_key:
 			goto changed;
 		}
 		break;
-	case '\025': /* C-u */
+	case 'u'|KEYC_CTRL:
 		c->prompt_buffer[0].size = 0;
 		c->prompt_index = 0;
 		goto changed;
-	case '\013': /* C-k */
+	case 'k'|KEYC_CTRL:
 		if (c->prompt_index < size) {
 			c->prompt_buffer[c->prompt_index].size = 0;
 			goto changed;
 		}
 		break;
-	case '\027': /* C-w */
+	case 'w'|KEYC_CTRL:
 		separators = options_get_string(oo, "word-separators");
 		idx = c->prompt_index;
 
@@ -1371,7 +1399,7 @@ process_key:
 		status_prompt_backward_word(c, separators);
 		goto changed;
 	case KEYC_UP:
-	case '\020': /* C-p */
+	case 'p'|KEYC_CTRL:
 		histstr = status_prompt_up_history(c->prompt_hindex,
 		    c->prompt_type);
 		if (histstr == NULL)
@@ -1381,7 +1409,7 @@ process_key:
 		c->prompt_index = utf8_strlen(c->prompt_buffer);
 		goto changed;
 	case KEYC_DOWN:
-	case '\016': /* C-n */
+	case 'n'|KEYC_CTRL:
 		histstr = status_prompt_down_history(c->prompt_hindex,
 		    c->prompt_type);
 		if (histstr == NULL)
@@ -1390,11 +1418,11 @@ process_key:
 		c->prompt_buffer = utf8_fromcstr(histstr);
 		c->prompt_index = utf8_strlen(c->prompt_buffer);
 		goto changed;
-	case '\031': /* C-y */
+	case 'y'|KEYC_CTRL:
 		if (status_prompt_paste(c))
 			goto changed;
 		break;
-	case '\024': /* C-t */
+	case 't'|KEYC_CTRL:
 		idx = c->prompt_index;
 		if (idx < size)
 			idx++;
@@ -1417,12 +1445,12 @@ process_key:
 		free(s);
 		break;
 	case '\033': /* Escape */
-	case '\003': /* C-c */
-	case '\007': /* C-g */
+	case 'c'|KEYC_CTRL:
+	case 'g'|KEYC_CTRL:
 		if (c->prompt_inputcb(c, c->prompt_data, NULL, 1) == 0)
 			status_prompt_clear(c);
 		break;
-	case '\022': /* C-r */
+	case 'r'|KEYC_CTRL:
 		if (~c->prompt_flags & PROMPT_INCREMENTAL)
 			break;
 		if (c->prompt_buffer[0].size == 0) {
@@ -1433,7 +1461,7 @@ process_key:
 		} else
 			prefix = '-';
 		goto changed;
-	case '\023': /* C-s */
+	case 's'|KEYC_CTRL:
 		if (~c->prompt_flags & PROMPT_INCREMENTAL)
 			break;
 		if (c->prompt_buffer[0].size == 0) {
@@ -1452,8 +1480,6 @@ process_key:
 	return (0);
 
 append_key:
-	if (key <= 0x1f || (key >= KEYC_BASE && key < KEYC_BASE_END))
-		return (0);
 	if (key <= 0x7f)
 		utf8_set(&tmp, key);
 	else if (KEYC_IS_UNICODE(key))
@@ -1602,8 +1628,9 @@ status_prompt_complete_list(u_int *size, const char *s, int at_start)
 	struct options_entry			 *o;
 	struct options_array_item		 *a;
 	const char				 *layouts[] = {
-		"even-horizontal", "even-vertical", "main-horizontal",
-		"main-vertical", "tiled", NULL
+		"even-horizontal", "even-vertical",
+		"main-horizontal", "main-horizontal-mirrored",
+		"main-vertical", "main-vertical-mirrored", "tiled", NULL
 	};
 
 	*size = 0;
@@ -1747,8 +1774,9 @@ status_prompt_complete_list_menu(struct client *c, char **list, u_int size,
 	else
 		offset = 0;
 
-	if (menu_display(menu, MENU_NOMOUSE|MENU_TAB, NULL, offset,
-	    py, c, NULL, status_prompt_menu_callback, spm) != 0) {
+	if (menu_display(menu, MENU_NOMOUSE|MENU_TAB, 0, NULL, offset, py, c,
+	    BOX_LINES_DEFAULT, NULL, NULL, NULL, NULL,
+	    status_prompt_menu_callback, spm) != 0) {
 		menu_free(menu);
 		free(spm);
 		return (0);
@@ -1812,6 +1840,7 @@ status_prompt_complete_window_menu(struct client *c, struct session *s,
 	}
 	if (size == 0) {
 		menu_free(menu);
+		free(spm);
 		return (NULL);
 	}
 	if (size == 1) {
@@ -1822,6 +1851,7 @@ status_prompt_complete_window_menu(struct client *c, struct session *s,
 		} else
 			tmp = list[0];
 		free(list);
+		free(spm);
 		return (tmp);
 	}
 	if (height > size)
@@ -1840,8 +1870,9 @@ status_prompt_complete_window_menu(struct client *c, struct session *s,
 	else
 		offset = 0;
 
-	if (menu_display(menu, MENU_NOMOUSE|MENU_TAB, NULL, offset,
-	    py, c, NULL, status_prompt_menu_callback, spm) != 0) {
+	if (menu_display(menu, MENU_NOMOUSE|MENU_TAB, 0, NULL, offset, py, c,
+	    BOX_LINES_DEFAULT, NULL, NULL, NULL, NULL,
+	    status_prompt_menu_callback, spm) != 0) {
 		menu_free(menu);
 		free(spm);
 		return (NULL);

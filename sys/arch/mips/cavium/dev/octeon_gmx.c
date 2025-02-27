@@ -1,4 +1,4 @@
-/*	$NetBSD: octeon_gmx.c,v 1.23 2023/07/20 23:31:27 gutteridge Exp $	*/
+/*	$NetBSD: octeon_gmx.c,v 1.25 2025/02/24 07:11:24 andvar Exp $	*/
 
 /*
  * Copyright (c) 2007 Internet Initiative Japan, Inc.
@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: octeon_gmx.c,v 1.23 2023/07/20 23:31:27 gutteridge Exp $");
+__KERNEL_RCSID(0, "$NetBSD: octeon_gmx.c,v 1.25 2025/02/24 07:11:24 andvar Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -331,7 +331,7 @@ octgmx_init(struct octgmx_softc *sc)
 		else
 			sc->sc_port_types[0] = GMX_MII_PORT;
 		if ((inf_mode & INF_MODE_TYPE) == 0) {
-			/* port 1 and 2 are configred as RGMII ports */
+			/* port 1 and 2 are configured as RGMII ports */
 			sc->sc_nports = 3;
 			sc->sc_port_types[1] = GMX_RGMII_PORT;
 			sc->sc_port_types[2] = GMX_RGMII_PORT;
@@ -1168,21 +1168,21 @@ octgmx_stats(struct octgmx_port_softc *sc)
          *  this is not add to input packet errors of interface.
          */
 	net_stat_ref_t nsr = IF_STAT_GETREF(ifp);
-	if_statadd_ref(nsr, if_iqdrops,
+	if_statadd_ref(ifp, nsr, if_iqdrops,
 	    (uint32_t)_GMX_PORT_RD8(sc, GMX0_RX0_STATS_PKTS_DRP));
-	if_statadd_ref(nsr, if_opackets,
+	if_statadd_ref(ifp, nsr, if_opackets,
 	    (uint32_t)_GMX_PORT_RD8(sc, GMX0_TX0_STAT3));
 
 	tmp = _GMX_PORT_RD8(sc, GMX0_TX0_STAT0);
-	if_statadd_ref(nsr, if_oerrors,
+	if_statadd_ref(ifp, nsr, if_oerrors,
 	    (uint32_t)tmp + ((uint32_t)(tmp >> 32) * 16));
-	if_statadd_ref(nsr, if_collisions, (uint32_t)tmp);
+	if_statadd_ref(ifp, nsr, if_collisions, (uint32_t)tmp);
 
 	tmp = _GMX_PORT_RD8(sc, GMX0_TX0_STAT1);
-	if_statadd_ref(nsr, if_collisions,
+	if_statadd_ref(ifp, nsr, if_collisions,
 	    (uint32_t)tmp + (uint32_t)(tmp >> 32));
 
 	tmp = _GMX_PORT_RD8(sc, GMX0_TX0_STAT9);
-	if_statadd_ref(nsr, if_oerrors, (uint32_t)(tmp >> 32));
+	if_statadd_ref(ifp, nsr, if_oerrors, (uint32_t)(tmp >> 32));
 	IF_STAT_PUTREF(ifp);
 }

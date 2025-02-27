@@ -1,4 +1,4 @@
-/*	$NetBSD: decl_struct_member.c,v 1.17 2023/05/22 12:55:04 rillig Exp $	*/
+/*	$NetBSD: decl_struct_member.c,v 1.19 2025/01/03 03:14:47 rillig Exp $	*/
 # 3 "decl_struct_member.c"
 
 /* lint1-extra-flags: -X 351 */

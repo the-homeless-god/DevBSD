@@ -1,5 +1,5 @@
 #!  /usr/bin/lua
--- $NetBSD: check-expect.lua,v 1.8 2023/12/17 09:44:00 rillig Exp $
+-- $NetBSD: check-expect.lua,v 1.10 2025/01/11 20:16:40 rillig Exp $
 
 --[[
 
@@ -19,6 +19,10 @@ expected text in the corresponding .exp file.
 # expect[+-]offset: <message>
         Each message must occur in the .exp file and refer back to the
         source line in the .mk file.
+
+# expect-not: <substring>
+        The substring must not occur as part of any line of the .exp file.
+
 ]]
 
 
@@ -104,6 +108,18 @@ local function check_mk(mk_fname)
   local prev_expect_line = 0
 
   for mk_lineno, mk_line in ipairs(mk_lines) do
+
+    for text in mk_line:gmatch("#%s*expect%-not:%s*(.*)") do
+      local i = 1
+      while i <= #exp_lines and not exp_lines[i]:find(text, 1, true) do
+        i = i + 1
+      end
+      if i <= #exp_lines then
+        print_error("error: %s:%d: %s must not contain '%s'",
+          mk_fname, mk_lineno, exp_fname, text)
+      end
+    end
+
     for text in mk_line:gmatch("#%s*expect:%s*(.*)") do
       local i = prev_expect_line
       -- As of 2022-04-15, some lines in the .exp files contain trailing
@@ -135,6 +151,9 @@ local function check_mk(mk_fname)
             by_location[location][i] = ""
             found = true
             break
+          elseif message ~= "" then
+            print_error("error: %s:%d: out-of-order '%s'",
+              mk_fname, mk_lineno, message)
           end
         end
       end

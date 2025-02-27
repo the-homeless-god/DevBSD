@@ -1,7 +1,9 @@
-/*	$NetBSD: float.h,v 1.22 2023/12/31 04:20:40 dholland Exp $	*/
+/*	$NetBSD: float.h,v 1.24 2024/10/30 15:56:11 riastradh Exp $	*/
 
 #ifndef _M68K_FLOAT_H_
 #define _M68K_FLOAT_H_
+
+#include <sys/featuretest.h>
 
 /*
  * LDBL_MIN is half the x86 LDBL_MIN, even though both are 12-byte
@@ -23,7 +25,7 @@
  * in particular and pp. 3-2 to 3-5 in general.
  *
  * If anyone needs to update this comment please make sure the copy in
- * m68k/float.h also gets updated.
+ * x86/include/float.h also gets updated.
  */
 
 #if defined(__LDBL_MANT_DIG__)

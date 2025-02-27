@@ -1,4 +1,4 @@
-/*	$NetBSD: cd.c,v 1.354 2022/06/26 21:00:28 andvar Exp $	*/
+/*	$NetBSD: cd.c,v 1.356 2024/12/01 20:23:45 andvar Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001, 2003, 2004, 2005, 2008 The NetBSD Foundation,
@@ -50,7 +50,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cd.c,v 1.354 2022/06/26 21:00:28 andvar Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cd.c,v 1.356 2024/12/01 20:23:45 andvar Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1545,6 +1545,11 @@ read_cd_capacity(struct scsipi_periph *periph, uint32_t *blksize, u_long *last_l
 		*blksize = 2048;	/* some drives lie ! */
 	}
 
+	/* If the device doesn't handle READ_DISCINFO properly, */
+	/* return the dummies */
+	if (periph->periph_quirks & PQUIRK_NOREADDISCINFO)
+		return 0;
+
 	/* recordables have READ_DISCINFO implemented */
 	flags = XS_CTL_DATA_IN | XS_CTL_SILENT;
 	memset(&di_cmd, 0, sizeof(di_cmd));
@@ -2414,11 +2419,12 @@ cd_setblksize(struct cd_softc *cd)
 	}
 
 	if (bsize == 0) {
-printf("cd_setblksize: trying to change bsize, but no blk_desc\n");
+		printf("cd_setblksize: trying to change bsize, but no blk_desc\n");
+		
 		return (EINVAL);
 	}
 	if (_3btol(bdesc->blklen) == 2048) {
-printf("cd_setblksize: trying to change bsize, but blk_desc is correct\n");
+		printf("cd_setblksize: trying to change bsize, but blk_desc is correct\n");
 		return (EINVAL);
 	}
 
@@ -2519,7 +2525,7 @@ mmc_process_feature(struct mmc_discinfo *mmc_discinfo,
 		flags |= MMC_CAP_RECORDABLE;
 		flags |= MMC_CAP_FORMATTABLE;
 		break;
-	case 0x0024 :	/* hardware assised defect management feature */
+	case 0x0024 :	/* hardware assisted defect management feature */
 		flags |= MMC_CAP_HW_DEFECTFREE;
 		break;
 	case 0x0025 : 	/* write once */

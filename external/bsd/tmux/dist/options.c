@@ -578,10 +578,28 @@ char *
 options_to_string(struct options_entry *o, int idx, int numeric)
 {
 	struct options_array_item	*a;
+	char				*result = NULL;
+	char				*last = NULL;
+	char				*next;
 
 	if (OPTIONS_IS_ARRAY(o)) {
-		if (idx == -1)
-			return (xstrdup(""));
+		if (idx == -1) {
+			RB_FOREACH(a, options_array, &o->value.array) {
+				next = options_value_to_string(o, &a->value,
+				    numeric);
+				if (last == NULL)
+					result = next;
+				else {
+					xasprintf(&result, "%s %s", last, next);
+					free(last);
+					free(next);
+				}
+				last = result;
+			}
+			if (result == NULL)
+				return (xstrdup(""));
+			return (result);
+		}
 		a = options_array_item(o, idx);
 		if (a == NULL)
 			return (xstrdup(""));
@@ -1106,7 +1124,6 @@ options_push_changes(const char *name)
 	struct session		*s;
 	struct window		*w;
 	struct window_pane	*wp;
-	int			 c;
 
 	log_debug("%s: %s", __func__, name);
 
@@ -1119,18 +1136,12 @@ options_push_changes(const char *name)
 		}
 	}
 	if (strcmp(name, "cursor-colour") == 0) {
-		RB_FOREACH(wp, window_pane_tree, &all_window_panes) {
-			c = options_get_number(wp->options, name);
-			wp->screen->default_ccolour = c;
-		}
+		RB_FOREACH(wp, window_pane_tree, &all_window_panes)
+			window_pane_default_cursor(wp);
 	}
 	if (strcmp(name, "cursor-style") == 0) {
-		RB_FOREACH(wp, window_pane_tree, &all_window_panes) {
-			wp->screen->default_mode = 0;
-			screen_set_cursor_style(options_get_number(wp->options,
-			    name), &wp->screen->default_cstyle,
-			    &wp->screen->default_mode);
-		}
+		RB_FOREACH(wp, window_pane_tree, &all_window_panes)
+			window_pane_default_cursor(wp);
 	}
 	if (strcmp(name, "fill-character") == 0) {
 		RB_FOREACH(w, windows, &windows)

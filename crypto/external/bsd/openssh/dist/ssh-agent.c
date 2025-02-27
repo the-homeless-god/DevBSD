@@ -1,5 +1,5 @@
-/*	$NetBSD: ssh-agent.c,v 1.37 2023/12/20 17:15:21 christos Exp $	*/
-/* $OpenBSD: ssh-agent.c,v 1.303 2023/12/18 14:48:08 djm Exp $ */
+/*	$NetBSD: ssh-agent.c,v 1.40 2025/02/18 17:53:24 christos Exp $	*/
+/* $OpenBSD: ssh-agent.c,v 1.306 2024/03/09 05:12:13 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -37,7 +37,7 @@
  */
 
 #include "includes.h"
-__RCSID("$NetBSD: ssh-agent.c,v 1.37 2023/12/20 17:15:21 christos Exp $");
+__RCSID("$NetBSD: ssh-agent.c,v 1.40 2025/02/18 17:53:24 christos Exp $");
 
 #include <sys/param.h>	/* MIN MAX */
 #include <sys/types.h>
@@ -156,6 +156,8 @@ int max_fd = 0;
 pid_t parent_pid = -1;
 time_t parent_alive_interval = 0;
 
+sig_atomic_t signalled = 0;
+
 /* pid of process for which cleanup_socket is applicable */
 pid_t cleanup_pid = 0;
 
@@ -244,6 +246,7 @@ free_dest_constraints(struct dest_constraint *dcs, size_t ndcs)
 	free(dcs);
 }
 
+#ifdef ENABLE_PKCS11
 static void
 dup_dest_constraint_hop(const struct dest_constraint_hop *dch,
     struct dest_constraint_hop *out)
@@ -283,6 +286,7 @@ dup_dest_constraints(const struct dest_constraint *dcs, size_t ndcs)
 	}
 	return ret;
 }
+#endif /* ENABLE_PKCS11 */
 
 #ifdef DEBUG_CONSTRAINTS
 static void
@@ -1198,6 +1202,7 @@ parse_key_constraint_extension(struct sshbuf *m, char **sk_providerp,
 	    "restrict-destination-v00@openssh.com") == 0) {
 		if (*dcsp != NULL) {
 			error_f("%s already set", ext_name);
+			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
 		if ((r = sshbuf_froms(m, &b)) != 0) {
@@ -1207,6 +1212,7 @@ parse_key_constraint_extension(struct sshbuf *m, char **sk_providerp,
 		while (sshbuf_len(b) != 0) {
 			if (*ndcsp >= AGENT_MAX_DEST_CONSTRAINTS) {
 				error_f("too many %s constraints", ext_name);
+				r = SSH_ERR_INVALID_FORMAT;
 				goto out;
 			}
 			*dcsp = xrecallocarray(*dcsp, *ndcsp, *ndcsp + 1,
@@ -1224,6 +1230,7 @@ parse_key_constraint_extension(struct sshbuf *m, char **sk_providerp,
 		}
 		if (*certs != NULL) {
 			error_f("%s already set", ext_name);
+			r = SSH_ERR_INVALID_FORMAT;
 			goto out;
 		}
 		if ((r = sshbuf_get_u8(m, &v)) != 0 ||
@@ -1235,6 +1242,7 @@ parse_key_constraint_extension(struct sshbuf *m, char **sk_providerp,
 		while (sshbuf_len(b) != 0) {
 			if (*ncerts >= AGENT_MAX_EXT_CERTS) {
 				error_f("too many %s constraints", ext_name);
+				r = SSH_ERR_INVALID_FORMAT;
 				goto out;
 			}
 			*certs = xrecallocarray(*certs, *ncerts, *ncerts + 1,
@@ -1516,10 +1524,11 @@ no_identities(SocketEntry *e)
 	sshbuf_free(msg);
 }
 
+#ifdef ENABLE_PKCS11
 /* Add an identity to idlist; takes ownership of 'key' and 'comment' */
 static void
 add_p11_identity(struct sshkey *key, char *comment, const char *provider,
-    time_t death, int confirm, struct dest_constraint *dest_constraints,
+    time_t death, u_int confirm, struct dest_constraint *dest_constraints,
     size_t ndest_constraints)
 {
 	Identity *id;
@@ -1542,7 +1551,6 @@ add_p11_identity(struct sshkey *key, char *comment, const char *provider,
 	idtab->nentries++;
 }
 
-#ifdef ENABLE_PKCS11
 static void
 process_add_smartcard_key(SocketEntry *e)
 {
@@ -1731,6 +1739,7 @@ process_ext_session_bind(SocketEntry *e)
 	/* record new key/sid */
 	if (e->nsession_ids >= AGENT_MAX_SESSION_IDS) {
 		error_f("too many session IDs recorded");
+		r = -1;
 		goto out;
 	}
 	e->session_ids = xrecallocarray(e->session_ids, e->nsession_ids,
@@ -2054,7 +2063,7 @@ after_poll(struct pollfd *pfd, size_t npfd, u_int maxfds)
 }
 
 static int
-prepare_poll(struct pollfd **pfdp, size_t *npfdp, int *timeoutp, u_int maxfds)
+prepare_poll(struct pollfd **pfdp, size_t *npfdp, struct timespec *timeoutp, u_int maxfds)
 {
 	struct pollfd *pfd = *pfdp;
 	size_t i, j, npfd = 0;
@@ -2120,14 +2129,8 @@ prepare_poll(struct pollfd **pfdp, size_t *npfdp, int *timeoutp, u_int maxfds)
 	if (parent_alive_interval != 0)
 		deadline = (deadline == 0) ? parent_alive_interval :
 		    MINIMUM(deadline, parent_alive_interval);
-	if (deadline == 0) {
-		*timeoutp = -1; /* INFTIM */
-	} else {
-		if (deadline > INT_MAX / 1000)
-			*timeoutp = INT_MAX / 1000;
-		else
-			*timeoutp = deadline * 1000;
-	}
+	if (deadline != 0)
+		ptimeout_deadline_sec(timeoutp, deadline);
 	return (1);
 }
 
@@ -2147,18 +2150,16 @@ void
 cleanup_exit(int i)
 {
 	cleanup_socket();
-	_exit(i);
-}
-
-/*ARGSUSED*/
-__dead static void
-cleanup_handler(int sig)
-{
-	cleanup_socket();
 #ifdef ENABLE_PKCS11
 	pkcs11_terminate();
 #endif
-	_exit(2);
+	_exit(i);
+}
+
+static void
+cleanup_handler(int sig)
+{
+	signalled = sig;
 }
 
 static void
@@ -2225,10 +2226,11 @@ main(int ac, char **av)
 	char pidstrbuf[1 + 3 * sizeof pid];
 	size_t len;
 	mode_t prev_mask;
-	int timeout = -1; /* INFTIM */
+	struct timespec timeout;
 	struct pollfd *pfd = NULL;
 	size_t npfd = 0;
 	u_int maxfds;
+	sigset_t nsigset, osigset;
 
 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
 	sanitise_stdfd();
@@ -2466,14 +2468,26 @@ skip:
 	ssh_signal(SIGHUP, cleanup_handler);
 	ssh_signal(SIGTERM, cleanup_handler);
 
+	sigemptyset(&nsigset);
+	sigaddset(&nsigset, SIGINT);
+	sigaddset(&nsigset, SIGHUP);
+	sigaddset(&nsigset, SIGTERM);
+
 #ifdef __OpenBSD__
 	if (pledge("stdio rpath cpath unix id proc exec", NULL) == -1)
 		fatal("%s: pledge: %s", __progname, strerror(errno));
 #endif
 
 	while (1) {
+		sigprocmask(SIG_BLOCK, &nsigset, &osigset);
+		if (signalled != 0) {
+			logit("exiting on signal %d", (int)signalled);
+			cleanup_exit(2);
+		}
+		ptimeout_init(&timeout);
 		prepare_poll(&pfd, &npfd, &timeout, maxfds);
-		result = poll(pfd, npfd, timeout);
+		result = ppoll(pfd, npfd, ptimeout_get_tsp(&timeout), &osigset);
+		sigprocmask(SIG_SETMASK, &osigset, NULL);
 		saved_errno = errno;
 		if (parent_alive_interval != 0)
 			check_parent_exists();

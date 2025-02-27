@@ -1,4 +1,4 @@
-/*	$NetBSD: tyname.c,v 1.62 2024/03/09 13:20:55 rillig Exp $	*/
+/*	$NetBSD: tyname.c,v 1.65 2024/12/08 17:12:00 rillig Exp $	*/
 
 /*-
  * Copyright (c) 2005 The NetBSD Foundation, Inc.
@@ -35,7 +35,7 @@
 
 #include <sys/cdefs.h>
 #if defined(__RCSID)
-__RCSID("$NetBSD: tyname.c,v 1.62 2024/03/09 13:20:55 rillig Exp $");
+__RCSID("$NetBSD: tyname.c,v 1.65 2024/12/08 17:12:00 rillig Exp $");
 #endif
 
 #include <assert.h>
@@ -94,11 +94,10 @@ intern(const char *name)
 	return n->ntn_name;
 }
 
-#if IS_LINT1
-void
-#else
-static void
+#if !IS_LINT1
+static
 #endif
+void
 buf_init(buffer *buf)
 {
 	buf->len = 0;
@@ -134,7 +133,10 @@ buf_add_char(buffer *buf, char c)
 }
 #endif
 
-static void
+#if !IS_LINT1
+static
+#endif
+void
 buf_add(buffer *buf, const char *s)
 {
 	buf_add_mem(buf, s, strlen(s));
@@ -176,7 +178,7 @@ type_name_of_function(buffer *buf, const type_t *tp)
 		type_t **argtype;
 
 		argtype = tp->t_args;
-		if (argtype == NULL)
+		if (*argtype == NULL)
 			buf_add(buf, "void");
 		for (; *argtype != NULL; argtype++) {
 			buf_add(buf, sep), sep = ", ";
@@ -261,6 +263,10 @@ type_name(const type_t *tp)
 		buf_add(&buf, "const ");
 	if (tp->t_volatile)
 		buf_add(&buf, "volatile ");
+#if IS_LINT1
+	if (tp->t_noreturn)
+		buf_add(&buf, "noreturn ");
+#endif
 
 #if IS_LINT1
 	if (is_struct_or_union(t) && tp->u.sou->sou_incomplete)

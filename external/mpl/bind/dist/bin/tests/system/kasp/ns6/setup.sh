@@ -29,6 +29,11 @@ R="RUMOURED"
 O="OMNIPRESENT"
 U="UNRETENTIVE"
 
+for zn in shorter-lifetime longer-lifetime limit-lifetime unlimit-lifetime; do
+  setup $zn
+  cp template.db.in $zonefile
+done
+
 # The child zones (step1, step2) beneath these zones represent the various
 # steps of unsigning a zone.
 for zn in going-insecure.kasp going-insecure-dynamic.kasp; do
@@ -81,6 +86,18 @@ cat template.db.in "${CSK}.key" >"$infile"
 private_type_record $zone $DEFAULT_ALGORITHM_NUMBER "$CSK" >>"$infile"
 cp $infile $zonefile
 $SIGNER -S -z -x -s now-1h -e now+2w -o $zone -O raw -f "${zonefile}.signed" $infile >signer.out.$zone.1 2>&1
+
+# This zone is going straight to "none" policy. This is undefined behavior.
+setup step1.going-straight-to-none-dynamic.kasp
+echo "$zone" >>zones
+TactN="now"
+csktimes="-P ${TactN} -A ${TactN} -P sync ${TactN}"
+CSK=$($KEYGEN -k default $csktimes $zone 2>keygen.out.$zone.1)
+$SETTIME -s -g $O -k $O $TactN -z $O $TactN -r $O $TactN -d $O $TactN "$CSK" >settime.out.$zone.1 2>&1
+cat template.db.in "${CSK}.key" >"$infile"
+private_type_record $zone $DEFAULT_ALGORITHM_NUMBER "$CSK" >>"$infile"
+cp $infile $zonefile
+$SIGNER -S -z -x -s now-1h -e now+2w -o $zone -O full -f "${zonefile}.signed" $infile >signer.out.$zone.1 2>&1
 
 #
 # The zones at algorithm-roll.kasp represent the various steps of a ZSK/KSK

@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.10 2024/04/09 22:38:17 christos Exp $
+# $NetBSD: Makefile,v 1.12 2025/01/14 19:58:10 riastradh Exp $
 
 LIBISPRIVATE=pic
 

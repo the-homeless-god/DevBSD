@@ -1,4 +1,4 @@
-/*	$NetBSD: acpi_resource.c,v 1.42 2021/08/07 18:39:40 jmcneill Exp $	*/
+/*	$NetBSD: acpi_resource.c,v 1.44 2025/01/02 16:32:34 andvar Exp $	*/
 
 /*
  * Copyright 2001 Wasabi Systems, Inc.
@@ -67,7 +67,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: acpi_resource.c,v 1.42 2021/08/07 18:39:40 jmcneill Exp $");
+__KERNEL_RCSID(0, "$NetBSD: acpi_resource.c,v 1.44 2025/01/02 16:32:34 andvar Exp $");
 
 #include <sys/param.h>
 #include <sys/device.h>
@@ -247,9 +247,7 @@ acpi_resource_parse_callback(ACPI_RESOURCE *res, void *context)
 
 	case ACPI_RESOURCE_TYPE_ADDRESS32:
 		/* XXX Only fixed size supported for now */
-		if (res->Data.Address32.Address.AddressLength == 0 ||
-		    (!arg->include_producer &&
-		     res->Data.Address32.ProducerConsumer != ACPI_CONSUMER))
+		if (res->Data.Address32.Address.AddressLength == 0)
 			break;
 #define ADDRESS32_FIXED2(r)						\
 	((r)->Data.Address32.MinAddressFixed == ACPI_ADDRESS_FIXED &&	\
@@ -303,9 +301,7 @@ acpi_resource_parse_callback(ACPI_RESOURCE *res, void *context)
 	case ACPI_RESOURCE_TYPE_ADDRESS64:
 #ifdef _LP64
 		/* XXX Only fixed size supported for now */
-		if (res->Data.Address64.Address.AddressLength == 0 ||
-		    (!arg->include_producer &&
-		     res->Data.Address64.ProducerConsumer != ACPI_CONSUMER))
+		if (res->Data.Address64.Address.AddressLength == 0)
 			break;
 #define ADDRESS64_FIXED2(r)						\
 	((r)->Data.Address64.MinAddressFixed == ACPI_ADDRESS_FIXED &&	\
@@ -805,6 +801,15 @@ acpi_res_parse_ioport(device_t dev, void *context, uint32_t base,
 			ar->ar_length += length;
 			return;
 		}
+	}
+
+	/* IO and FixedIO I/O resource addresses are limited to 10/16-bit. */
+	if (base + length - 1 > UINT16_MAX) {
+		aprint_error_dev(dev, "ACPI: invalid I/O register resource %d,"
+		    " base 0x%x, length %d\n",
+		    res->ar_nio, base, length);
+		res->ar_nio++;
+		return;
 	}
 
 	ar = ACPI_ALLOCATE(sizeof(*ar));

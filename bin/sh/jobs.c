@@ -1,4 +1,4 @@
-/*	$NetBSD: jobs.c,v 1.119 2024/01/30 19:05:07 kre Exp $	*/
+/*	$NetBSD: jobs.c,v 1.123 2024/10/09 13:43:32 kre Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)jobs.c	8.5 (Berkeley) 5/4/95";
 #else
-__RCSID("$NetBSD: jobs.c,v 1.119 2024/01/30 19:05:07 kre Exp $");
+__RCSID("$NetBSD: jobs.c,v 1.123 2024/10/09 13:43:32 kre Exp $");
 #endif
 #endif /* not lint */
 
@@ -111,7 +111,7 @@ STATIC int dowait(int, struct job *, struct job **);
 #define WSILENT 4
 STATIC int jobstatus(const struct job *, int);
 STATIC int waitproc(int, struct job *, int *);
-STATIC void cmdtxt(union node *);
+STATIC int cmdtxt(union node *, int);
 STATIC void cmdlist(union node *, int);
 STATIC void cmdputs(const char *);
 inline static void cmdputi(int);
@@ -705,6 +705,7 @@ waitcmd(int argc, char **argv)
 	int i;
 	int any = 0;
 	int found;
+	int oldwait = 0;
 	char *pid = NULL, *fpid;
 	char **arg;
 	char idstring[20];
@@ -721,6 +722,9 @@ waitcmd(int argc, char **argv)
 			break;
 		}
 	}
+
+	if (!any && *argptr == 0)
+		oldwait = 1;
 
 	if (pid != NULL) {
 		if (!validname(pid, '\0', NULL))
@@ -740,7 +744,7 @@ waitcmd(int argc, char **argv)
 	if (jobs_invalid) {
 		CTRACE(DBG_WAIT, ("builtin wait%s%s in child, invalid jobtab\n",
 		    any ? " -n" : "", *argptr ? " pid..." : ""));
-		return (any || *argptr) ? 127 : 0;
+		return oldwait ? 0 : 127;
 	}
 
 	/*
@@ -919,7 +923,7 @@ waitcmd(int argc, char **argv)
 		}
 
 		/* this is to handle "wait" (no args) */
-		if (found == 0 && job->state == JOBDONE) {
+		if (oldwait && job->state == JOBDONE) {
 			VTRACE(DBG_JOBS|DBG_WAIT, ("Cleanup: %d\n", i));
 			freejob(job);
 		}
@@ -976,13 +980,124 @@ jobidcmd(int argc, char **argv)
 	return 0;
 }
 
+#if JOBS
+#ifndef SMALL
+
+static int
+stop_me(int sig, int force, int pgrp, pid_t pid)
+{
+	if (force || (!loginsh && mflag && rootshell)) {
+		struct sigaction sig_dfl, sig_was;
+
+		sig_dfl.sa_handler = SIG_DFL;
+		sig_dfl.sa_flags = 0;
+		sigemptyset(&sig_dfl.sa_mask);
+
+		(void)sigaction(sig, &sig_dfl, &sig_was);
+
+		if (kill(pgrp ? 0 : pid, sig) == -1) {
+			sh_warn("suspend myself");
+			(void)sigaction(sig, &sig_was, NULL);
+			error(NULL);
+		}
+
+		(void)sigaction(sig, &sig_was, NULL);
+
+		return 0;
+	}
+
+	if (!rootshell)
+		sh_warnx("subshell environment");
+	else if (!mflag)
+		sh_warnx("job control disabled");
+	else if (loginsh)
+		sh_warnx("login shell");
+	else
+		sh_warnx("not possible??");
+
+	return 1;
+}
+
+int
+suspendcmd(int argc, char **argv)
+{
+	int sig = SIGTSTP;
+	int force = 0;
+	int pgrp = 0;
+	int status = 0;
+	char *target;
+	int c;
+
+	while ((c = nextopt("fgs:")) != 0) {
+		switch (c) {
+		case 'f':
+			force = 1;
+			break;
+		case 'g':
+			pgrp = 1;
+			break;
+		case 's':
+			sig = signame_to_signum(optionarg);
+
+			if (sig != SIGSTOP && sig != SIGTSTP &&
+			    sig != SIGTTIN && sig != SIGTTOU)
+				error("bad signal '%s'", optionarg);
+			break;
+		}
+	}
+
+	if (!*argptr)		/* suspend myself */
+		return stop_me(sig, force, pgrp, getpid());
+
+	while ((target = *argptr++) != NULL)
+	{
+		int pid;
+
+		if (is_number(target)) {
+			if ((pid = number(target)) == 0) {
+				sh_warnx("Cannot (yet) suspend kernel (%s)",
+				    target);
+				status = 1;
+				continue;
+			}
+		} else if ((pid = getjobpgrp(target)) == 0) {
+			sh_warnx("Unknown job: %s", target);
+			status = 1;
+			continue;
+		}
+
+		if (pid == rootpid || pid == getpid()) {
+			status |= stop_me(sig, force, pgrp, pid);
+			continue;
+		}
+
+		if (pid == 1 || pid == -1) {
+			sh_warnx("Don't be funny");
+			status = 1;
+			continue;
+		}
+
+		if (pid > 0 && pgrp)
+			pid = -pid;
+
+		if (kill(pid, sig) == -1) {
+			sh_warn("failed to suspend %s", target);
+			status = 1;
+		}
+	}
+
+	return status;
+}
+#endif	/* SMALL */
+#endif	/* JOBS */
+
 int
 getjobpgrp(const char *name)
 {
 	struct job *jp;
 
 	if (jobs_invalid)
-		error("No such job: %s", name);
+		return 0;
 	jp = getjob(name, 1);
 	if (jp == 0)
 		return 0;
@@ -1096,6 +1211,21 @@ anyjobs(void)
 	}
 
 	return 0;
+}
+
+/*
+ * Output the (new) POSIX required "[%d] %d" string whenever an
+ * async (ie: background) job is started in an interactive shell.
+ * Note that a subshell environment is not regarded as interactive.
+ */
+void
+jobstarted(struct job *jp)
+{
+	if (!iflag || !rootshell)
+		return;
+
+	outfmt(out2, "[%d] %ld\n", JNUM(jp),
+	    jp->pgrp != 0 ? (long)jp->pgrp : (long)jp->ps->pid);
 }
 
 /*
@@ -1705,7 +1835,7 @@ commandtext(struct procstat *ps, union node *n)
 	else
 		len = sizeof(ps->cmd) / 10;
 	cmdnleft = len;
-	cmdtxt(n);
+	(void)cmdtxt(n, 1);
 	if (cmdnleft <= 0) {
 		char *p = ps->cmd + len - 4;
 		p[0] = '.';
@@ -1721,8 +1851,16 @@ commandtext(struct procstat *ps, union node *n)
 }
 
 
-STATIC void
-cmdtxt(union node *n)
+/*
+ * Generate a string describing tree node n & its descendants (recursive calls)
+ *
+ * Return true (non-zero) if the output is complete (ends with an operator)
+ * so no ';' need be added before the following command.  Return false (zero)
+ * if a ';' is needed to terminate the output if it is followed by something
+ * which is not an operator.
+ */
+STATIC int
+cmdtxt(union node *n, int top)
 {
 	union node *np;
 	struct nodelist *lp;
@@ -1730,111 +1868,120 @@ cmdtxt(union node *n)
 	int i;
 
 	if (n == NULL || cmdnleft <= 0)
-		return;
+		return 1;
 	switch (n->type) {
 	case NSEMI:
-		cmdtxt(n->nbinary.ch1);
-		cmdputs("; ");
-		cmdtxt(n->nbinary.ch2);
-		break;
+		if (!cmdtxt(n->nbinary.ch1, 0))
+			cmdputs(";");
+		cmdputs(" ");
+		return cmdtxt(n->nbinary.ch2, 0);
 	case NAND:
-		cmdtxt(n->nbinary.ch1);
+		(void)cmdtxt(n->nbinary.ch1, 0);
 		cmdputs(" && ");
-		cmdtxt(n->nbinary.ch2);
-		break;
+		return cmdtxt(n->nbinary.ch2, 0);
 	case NOR:
-		cmdtxt(n->nbinary.ch1);
+		(void) cmdtxt(n->nbinary.ch1, 0);
 		cmdputs(" || ");
-		cmdtxt(n->nbinary.ch2);
-		break;
+		return cmdtxt(n->nbinary.ch2, 0);
 	case NDNOT:
 		cmdputs("! ");
 		/* FALLTHROUGH */
 	case NNOT:
 		cmdputs("! ");
-		cmdtxt(n->nnot.com);
+		return cmdtxt(n->nnot.com, 0);
 		break;
 	case NPIPE:
 		for (lp = n->npipe.cmdlist ; lp ; lp = lp->next) {
-			cmdtxt(lp->n);
+			(void) cmdtxt(lp->n, 0);
 			if (lp->next)
 				cmdputs(" | ");
 		}
-		if (n->npipe.backgnd)
+		if (!top && n->npipe.backgnd) {
 			cmdputs(" &");
-		break;
+			return 1;
+		}
+		return 0;
 	case NSUBSHELL:
 		cmdputs("(");
-		cmdtxt(n->nredir.n);
+		(void) cmdtxt(n->nredir.n, 0);
 		cmdputs(")");
-		break;
+		return 0;
 	case NREDIR:
 	case NBACKGND:
-		cmdtxt(n->nredir.n);
-		break;
+		return cmdtxt(n->nredir.n, top);
 	case NIF:
 		cmdputs("if ");
-		cmdtxt(n->nif.test);
-		cmdputs("; then ");
-		cmdtxt(n->nif.ifpart);
+		if (!cmdtxt(n->nif.test, 0))
+			cmdputs(";");
+		cmdputs(" then ");
+		i = cmdtxt(n->nif.ifpart, 0);
 		if (n->nif.elsepart) {
-			cmdputs("; else ");
-			cmdtxt(n->nif.elsepart);
+			if (i == 0)
+				cmdputs(";");
+			cmdputs(" else ");
+			i = cmdtxt(n->nif.elsepart, 0);
 		}
-		cmdputs("; fi");
-		break;
+		if (i == 0)
+			cmdputs(";");
+		cmdputs(" fi");
+		return 0;
 	case NWHILE:
 		cmdputs("while ");
 		goto until;
 	case NUNTIL:
 		cmdputs("until ");
  until:
-		cmdtxt(n->nbinary.ch1);
-		cmdputs("; do ");
-		cmdtxt(n->nbinary.ch2);
-		cmdputs("; done");
-		break;
+		if (!cmdtxt(n->nbinary.ch1, 0))
+			cmdputs(";");
+		cmdputs(" do ");
+		if (!cmdtxt(n->nbinary.ch2, 0))
+			cmdputs(";");
+		cmdputs(" done");
+		return 0;
 	case NFOR:
 		cmdputs("for ");
 		cmdputs(n->nfor.var);
 		cmdputs(" in ");
 		cmdlist(n->nfor.args, 1);
 		cmdputs("; do ");
-		cmdtxt(n->nfor.body);
-		cmdputs("; done");
-		break;
+		if (!cmdtxt(n->nfor.body, 0))
+			cmdputs(";");
+		cmdputs(" done");
+		return 0;
 	case NCASE:
 		cmdputs("case ");
 		cmdputs(n->ncase.expr->narg.text);
 		cmdputs(" in ");
 		for (np = n->ncase.cases; np; np = np->nclist.next) {
-			cmdtxt(np->nclist.pattern);
+			(void) cmdtxt(np->nclist.pattern, 0);
 			cmdputs(") ");
-			cmdtxt(np->nclist.body);
+			(void) cmdtxt(np->nclist.body, 0);
 			switch (n->type) {	/* switch (not if) for later */
 			case NCLISTCONT:
-				cmdputs(";& ");
+				cmdputs(" ;& ");
 				break;
 			default:
-				cmdputs(";; ");
+				cmdputs(" ;; ");
 				break;
 			}
 		}
 		cmdputs("esac");
-		break;
+		return 0;
 	case NDEFUN:
 		cmdputs(n->narg.text);
 		cmdputs("() { ... }");
-		break;
+		return 0;
 	case NCMD:
 		cmdlist(n->ncmd.args, 1);
 		cmdlist(n->ncmd.redirect, 0);
-		if (n->ncmd.backgnd)
+		if (!top && n->ncmd.backgnd) {
 			cmdputs(" &");
-		break;
+			return 1;
+		}
+		return 0;
 	case NARG:
 		cmdputs(n->narg.text);
-		break;
+		return 0;
 	case NTO:
 		p = ">";  i = 1;  goto redir;
 	case NCLOBBER:
@@ -1859,17 +2006,18 @@ cmdtxt(union node *n)
 			else
 				cmdputi(n->ndup.dupfd);
 		} else {
-			cmdtxt(n->nfile.fname);
+			(void) cmdtxt(n->nfile.fname, 0);
 		}
-		break;
+		return 0;
 	case NHERE:
 	case NXHERE:
 		cmdputs("<<...");
-		break;
+		return 0;
 	default:
 		cmdputs("???");
-		break;
+		return 0;
 	}
+	return 0;
 }
 
 STATIC void
@@ -1878,7 +2026,7 @@ cmdlist(union node *np, int sep)
 	for (; np; np = np->narg.next) {
 		if (!sep)
 			cmdputs(" ");
-		cmdtxt(np);
+		(void) cmdtxt(np, 0);
 		if (sep && np->narg.next)
 			cmdputs(" ");
 	}

@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * logerr: errx with logging
- * Copyright (c) 2006-2023 Roy Marples <roy@marples.name>
+ * Copyright (c) 2006-2025 Roy Marples <roy@marples.name>
  * All rights reserved
 
  * Redistribution and use in source and binary forms, with or without
@@ -376,6 +376,8 @@ logsetfd(int fd)
 	struct logctx *ctx = &_logctx;
 
 	ctx->log_fd = fd;
+	if (fd != -1)
+		closelog();
 #ifndef SMALL
 	if (fd != -1 && ctx->log_file != NULL) {
 		fclose(ctx->log_file);
@@ -425,6 +427,8 @@ logsetopts(unsigned int opts)
 
 	ctx->log_opts = opts;
 	setlogmask(LOG_UPTO(opts & LOGERR_DEBUG ? LOG_DEBUG : LOG_INFO));
+	if (!(ctx->log_opts & LOGERR_LOG))
+		closelog();
 }
 
 #ifdef LOGERR_TAG
@@ -445,7 +449,7 @@ int
 logopen(const char *path)
 {
 	struct logctx *ctx = &_logctx;
-	int opts = 0;
+	int opts = LOG_NDELAY; /* Ensure openlog gets a fd */
 
 	/* Cache timezone */
 	tzset();
@@ -461,7 +465,8 @@ logopen(const char *path)
 
 	if (ctx->log_opts & LOGERR_LOG_PID)
 		opts |= LOG_PID;
-	openlog(getprogname(), opts, LOGERR_SYSLOG_FACILITY);
+	if (ctx->log_opts & LOGERR_LOG)
+		openlog(getprogname(), opts, LOGERR_SYSLOG_FACILITY);
 	if (path == NULL)
 		return 1;
 

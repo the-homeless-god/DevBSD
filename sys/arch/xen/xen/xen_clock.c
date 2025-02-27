@@ -1,4 +1,4 @@
-/*	$NetBSD: xen_clock.c,v 1.18 2023/09/10 15:23:01 bouyer Exp $	*/
+/*	$NetBSD: xen_clock.c,v 1.20 2024/12/01 20:36:00 andvar Exp $	*/
 
 /*-
  * Copyright (c) 2017, 2018 The NetBSD Foundation, Inc.
@@ -36,7 +36,7 @@
 #endif
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: xen_clock.c,v 1.18 2023/09/10 15:23:01 bouyer Exp $");
+__KERNEL_RCSID(0, "$NetBSD: xen_clock.c,v 1.20 2024/12/01 20:36:00 andvar Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -835,7 +835,7 @@ xen_timer_handler(void *cookie, struct clockframe *frame)
 
 		/*
 		 * Warn if we violate timecounter(9) contract: with a
-		 * k-bit timeocunter (here k = 32), and timecounter
+		 * k-bit timecounter (here k = 32), and timecounter
 		 * frequency f (here f = 1 GHz), the maximum period
 		 * between hardclock calls is 2^k / f.
 		 */
@@ -1106,6 +1106,7 @@ xen_rtc_set(struct todr_chip_handle *todr, struct timeval *tvp)
 		systime_ns = xen_global_systime_ns();
 
 		/* Set the hypervisor wall clock time.  */
+		memset(&op, 0, sizeof(op));
 		op.cmd = XENPF_settime;
 		op.u.settime.secs = tvp->tv_sec;
 		op.u.settime.nsecs = tvp->tv_usec * 1000;

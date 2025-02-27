@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.219 2024/04/01 02:22:38 christos Exp $
+#	$NetBSD: Makefile,v 1.227 2024/10/23 00:45:58 kalvisd Exp $
 
 .include <bsd.own.mk>
 .include <bsd.endian.mk>
@@ -29,7 +29,7 @@ TOOLCHAIN_BITS+= gmake .WAIT
 TOOLCHAIN_BITS+= gmp .WAIT
 TOOLCHAIN_BITS+= mpfr .WAIT
 TOOLCHAIN_BITS+= mpc .WAIT
-.  if (defined(HAVE_GCC) && ${HAVE_GCC} >= 12)
+.  if (defined(HAVE_GCC) && ${HAVE_GCC} >= 12 && !defined(NOGCCISL))
 TOOLCHAIN_BITS+= isl .WAIT
 .  endif
 . endif
@@ -172,6 +172,8 @@ SUBDIR+=	ibmnws-ncdcs
 
 .if ${MACHINE} == "macppc"
 SUBDIR+=	macppc-fixcoff
+SUBDIR+=	macppc_installboot
+SUBDIR+=	macppc_mkboothfs
 .endif
 
 .if (${MACHINE} == "prep" || ${MACHINE} == "rs6000" || ${MACHINE} == "bebox")
@@ -211,6 +213,10 @@ SUBDIR+=	amiga-txlt
 SUBDIR+=	hp300-mkboot
 .endif
 
+.if ${MACHINE} == "vax"
+SUBDIR+=	libmopcopy vax-mopcopy
+.endif
+
 .if ${MACHINE} == "evbarm" \
     && ${MACHINE_CPU} == "arm" \
     && ${TARGET_ENDIANNESS} == "1234"
@@ -219,20 +225,19 @@ SUBDIR+=	elftosb
 
 .if ${MACHINE} == "evbarm" || ${MACHINE} == "evbmips" || \
     ${MACHINE} == "evbppc" || ${MACHINE} == "evbsh3" || \
-    ${MACHINE} == "sandpoint"
-SUBDIR+=	mkubootimage
-.endif
-
-.if ${MACHINE} == "evbarm" || ${MACHINE} == "evbmips" || \
-    ${MACHINE} == "evbppc" || ${MACHINE} == "evbsh3" || \
     ${MACHINE} == "sandpoint" || \
     ${MACHINE_CPU} == "riscv"
+SUBDIR+=	mkubootimage
 SUBDIR+=	libfdt .WAIT
 SUBDIR+=	dtc
 .endif
 
 .if ${MACHINE} == "mvme68k"
 SUBDIR+=	mvme68k-wrtvid
+.endif
+
+.if ${MACHINE} == "mac68k" || ${MACHINE} == "macppc"
+SUBDIR+=	mkhybrid
 .endif
 
 .if ${MKX11} != "no"

@@ -1,4 +1,4 @@
-/*	$NetBSD: cs89x0.c,v 1.54 2024/02/10 18:43:52 andvar Exp $	*/
+/*	$NetBSD: cs89x0.c,v 1.56 2025/01/07 20:24:10 andvar Exp $	*/
 
 /*
  * Copyright (c) 2004 Christopher Gilbert
@@ -212,7 +212,7 @@
 */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: cs89x0.c,v 1.54 2024/02/10 18:43:52 andvar Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cs89x0.c,v 1.56 2025/01/07 20:24:10 andvar Exp $");
 
 #include "opt_inet.h"
 
@@ -1449,7 +1449,7 @@ cs_counter_event(struct cs_softc *sc, uint16_t cntEvent)
 		/* The count should be read before an overflow occurs. */
 		errorCount = CS_READ_PACKET_PAGE(sc, PKTPG_TX_COL);
 		/*
-		 * The tramsit event routine always checks the number of
+		 * The transmit event routine always checks the number of
 		 * collisions for any packet so we don't increment any
 		 * counters here, as they should already have been
 		 * considered.
@@ -1564,12 +1564,12 @@ cs_transmit_event(struct cs_softc *sc, uint16_t txEvent)
 	/* Add the number of collisions for this frame */
 	net_stat_ref_t nsr = IF_STAT_GETREF(ifp);
 	if (txEvent & TX_EVENT_16_COLL)
-		if_statadd_ref(nsr, if_collisions, 16);
+		if_statadd_ref(ifp, nsr, if_collisions, 16);
 	else
-		if_statadd_ref(nsr, if_collisions,
+		if_statadd_ref(ifp, nsr, if_collisions,
 		    ((txEvent & TX_EVENT_COLL_MASK) >> 11));
 
-	if_statinc_ref(nsr, if_opackets);
+	if_statinc_ref(ifp, nsr, if_opackets);
 	IF_STAT_PUTREF(ifp);
 
 	/* Transmission is no longer in progress */

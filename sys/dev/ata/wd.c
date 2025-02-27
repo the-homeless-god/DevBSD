@@ -1,4 +1,4 @@
-/*	$NetBSD: wd.c,v 1.469 2024/02/05 21:46:06 andvar Exp $ */
+/*	$NetBSD: wd.c,v 1.473 2025/02/27 01:34:43 jakllsch Exp $ */
 
 /*
  * Copyright (c) 1998, 2001 Manuel Bouyer.  All rights reserved.
@@ -54,7 +54,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wd.c,v 1.469 2024/02/05 21:46:06 andvar Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wd.c,v 1.473 2025/02/27 01:34:43 jakllsch Exp $");
 
 #include "opt_ata.h"
 #include "opt_wd.h"
@@ -104,7 +104,7 @@ __KERNEL_RCSID(0, "$NetBSD: wd.c,v 1.469 2024/02/05 21:46:06 andvar Exp $");
 #define DEBUG_FUNCS  0x08
 #define DEBUG_PROBE  0x10
 #define DEBUG_DETACH 0x20
-#define	DEBUG_XFERS  0x40
+#define DEBUG_XFERS  0x40
 #ifdef ATADEBUG
 #ifndef ATADEBUG_WD_MASK
 #define ATADEBUG_WD_MASK 0x0
@@ -461,9 +461,7 @@ wdattach(device_t parent, device_t self, void *aux)
 		if ((wd->sc_params.atap_logical_align & ATA_LA_VALID_MASK) ==
 		    ATA_LA_VALID) {
 			wd->sc_sectoralign.dsa_firstaligned =
-			    (wd->sc_sectoralign.dsa_alignment -
-				(wd->sc_params.atap_logical_align &
-				    ATA_LA_MASK));
+			    wd->sc_params.atap_logical_align & ATA_LA_MASK;
 		}
 	}
 	wd->sc_capacity512 = (wd->sc_capacity * wd->sc_blksize) / DEV_BSIZE;
@@ -993,7 +991,7 @@ retry2:
 
 			dbs = kmem_zalloc(sizeof *dbs, KM_NOSLEEP);
 			if (dbs == NULL) {
-				aprint_error_dev(dksc->sc_dev,
+				device_printf(dksc->sc_dev,
 				    "failed to add bad block to list\n");
 				goto out;
 			}
@@ -1511,6 +1509,7 @@ wdioctl(dev_t dev, u_long cmd, void *addr, int flag, struct lwp *l)
 				dsa->dsa_firstaligned = (dsa->dsa_firstaligned
 				    + dsa->dsa_alignment) - r;
 		}
+		dsa->dsa_firstaligned %= dsa->dsa_alignment;
 
 		return 0;
 	}
@@ -1841,7 +1840,7 @@ wd_check_error(const struct dk_softc *dksc, const struct ata_xfer *xfer,
 	if (flags & (AT_ERROR | AT_TIMEOU | AT_DF)) {
 		char sbuf[sizeof(at_errbits) + 64];
 		snprintb(sbuf, sizeof(sbuf), at_errbits, flags);
-		aprint_error_dev(dksc->sc_dev, "%s: status=%s\n", func, sbuf);
+		device_printf(dksc->sc_dev, "%s: status=%s\n", func, sbuf);
 		return EIO;
 	}
 	return 0;

@@ -1,4 +1,4 @@
-/*	$NetBSD: morse.c,v 1.20 2023/06/01 04:08:36 mrg Exp $	*/
+/*	$NetBSD: morse.c,v 1.23 2024/10/12 19:26:24 rillig Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -30,18 +30,10 @@
  */
 
 #include <sys/cdefs.h>
-#ifndef lint
 __COPYRIGHT("@(#) Copyright (c) 1988, 1993\
  The Regents of the University of California.  All rights reserved.");
-#endif /* not lint */
-
-#ifndef lint
-#if 0
-static char sccsid[] = "@(#)morse.c	8.1 (Berkeley) 5/31/93";
-#else
-__RCSID("$NetBSD: morse.c,v 1.20 2023/06/01 04:08:36 mrg Exp $");
-#endif
-#endif /* not lint */
+/*	@(#)morse.c	8.1 (Berkeley) 5/31/93	*/
+__RCSID("$NetBSD: morse.c,v 1.23 2024/10/12 19:26:24 rillig Exp $");
 
 #include <ctype.h>
 #include <stdio.h>
@@ -49,8 +41,7 @@ __RCSID("$NetBSD: morse.c,v 1.20 2023/06/01 04:08:36 mrg Exp $");
 #include <string.h>
 #include <unistd.h>
 
-static const char
-	*const digit[] = {
+static const char digit[][6] = {
 	"-----",
 	".----",
 	"..---",
@@ -61,8 +52,9 @@ static const char
 	"--...",
 	"---..",
 	"----.",
-},
-	*const alph[] = {
+};
+
+static const char alph[][5] = {
 	".-",
 	"-...",
 	"-.-.",
@@ -91,9 +83,9 @@ static const char
 	"--..",
 };
 
-static const struct punc {
+static const struct {
 	char c;
-	const char *morse;
+	const char morse[7];
 } other[] = {
 	{ '.', ".-.-.-" },
 	{ ',', "--..--" },
@@ -109,10 +101,9 @@ static const struct punc {
 	{ '+', ".-.-." },
 	{ '_', "..--.-" },
 	{ '@', ".--.-." },
-	{ '\0', NULL }
+	{ '\0', "" }
 };
 
-int	main(int, char *[]);
 static void morse(int);
 static void decode(const char *);
 static void show(const char *);
@@ -130,14 +121,13 @@ main(int argc, char **argv)
 	setgid(getgid());
 
 	while ((ch = getopt(argc, argv, "ds")) != -1)
-		switch((char)ch) {
+		switch ((char)ch) {
 		case 'd':
 			dflag = 1;
 			break;
 		case 's':
 			sflag = 1;
 			break;
-		case '?':
 		default:
 			fprintf(stderr, "usage: morse [-ds] [string ...]\n");
 			exit(1);
@@ -189,7 +179,7 @@ main(int argc, char **argv)
 		if (*argv)
 			do {
 				for (p = *argv; *p; ++p)
-					morse((int)*p);
+					morse((unsigned char)*p);
 				show("");
 			} while (*++argv);
 		else while ((ch = getchar()) != EOF)
@@ -203,53 +193,45 @@ main(int argc, char **argv)
 void
 decode(const char *s)
 {
-	int i;
-
-	for (i = 0; i < 10; i++)
+	for (size_t i = 0; i < __arraycount(digit); i++)
 		if (strcmp(digit[i], s) == 0) {
 			putchar('0' + i);
 			return;
 		}
 
-	for (i = 0; i < 26; i++)
+	for (size_t i = 0; i < __arraycount(alph); i++)
 		if (strcmp(alph[i], s) == 0) {
 			putchar('A' + i);
 			return;
 		}
-	i = 0;
-	while (other[i].c) {
+
+	for (size_t i = 0; other[i].c; i++)
 		if (strcmp(other[i].morse, s) == 0) {
 			putchar(other[i].c);
 			return;
 		}
-		i++;
-	}
-	if (strcmp("...-.-", s) == 0)
+
+	if (strcmp("...-.-", s) == 0)	/* SK */
 		return;
+
 	putchar('x');	/* line noise */
 }
 
 void
 morse(int c)
 {
-	int i;
-
 	if (isalpha(c))
 		show(alph[c - (isupper(c) ? 'A' : 'a')]);
 	else if (isdigit(c))
 		show(digit[c - '0']);
 	else if (isspace(c))
 		show("");  /* could show BT for a pause */
-	else {
-		i = 0;
-		while (other[i].c) {
+	else
+		for (int i = 0; other[i].c; i++)
 			if (other[i].c == c) {
 				show(other[i].morse);
 				break;
 			}
-			i++;
-		}
-	}
 }
 
 void
